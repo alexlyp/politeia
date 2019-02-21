@@ -49,15 +49,15 @@ func paywallHasExpired(pollExpiry int64) bool {
 
 // paywallIsEnabled returns true if paywall is enabled for the server, false
 // otherwise.
-func (b *backend) paywallIsEnabled() bool {
-	return b.cfg.PaywallAmount != 0 && b.cfg.PaywallXpub != ""
+func (p *politeiawww) paywallIsEnabled() bool {
+	return p.cfg.PaywallAmount != 0 && p.cfg.PaywallXpub != ""
 }
 
 // addUserToPaywallPool adds a database user to the paywall pool.
 //
 // This function must be called WITH the mutex held.
-func (b *backend) addUserToPaywallPool(user *database.User, paywallType string) {
-	b.userPaywallPool[user.ID] = paywallPoolMember{
+func (p *politeiawww) addUserToPaywallPool(user *database.User, paywallType string) {
+	p.userPaywallPool[user.ID] = paywallPoolMember{
 		paywallType: paywallType,
 		address:     user.NewUserPaywallAddress,
 		amount:      user.NewUserPaywallAmount,
@@ -69,52 +69,52 @@ func (b *backend) addUserToPaywallPool(user *database.User, paywallType string) 
 // addUserToPaywallPoolLock adds a user and its paywall info to the in-memory pool.
 //
 // This function must be called WITHOUT the mutex held.
-func (b *backend) addUserToPaywallPoolLock(user *database.User, paywallType string) {
-	if !b.paywallIsEnabled() {
+func (p *politeiawww) addUserToPaywallPoolLock(user *database.User, paywallType string) {
+	if !p.paywallIsEnabled() {
 		return
 	}
 
-	b.Lock()
-	defer b.Unlock()
+	p.Lock()
+	defer p.Unlock()
 
-	b.addUserToPaywallPool(user, paywallType)
+	p.addUserToPaywallPool(user, paywallType)
 }
 
-func (b *backend) updateUserAsPaid(user *database.User, tx string) error {
+func (p *politeiawww) updateUserAsPaid(user *database.User, tx string) error {
 	user.NewUserPaywallTx = tx
 	user.NewUserPaywallPollExpiry = 0
-	return b.db.UserUpdate(*user)
+	return p.db.UserUpdate(*user)
 }
 
-func (b *backend) derivePaywallInfo(user *database.User) (string, uint64, int64, error) {
-	address, err := util.DerivePaywallAddress(b.params,
-		b.cfg.PaywallXpub, uint32(user.PaywallAddressIndex))
+func (p *politeiawww) derivePaywallInfo(user *database.User) (string, uint64, int64, error) {
+	address, err := util.DerivePaywallAddress(p.params,
+		p.cfg.PaywallXpub, uint32(user.PaywallAddressIndex))
 	if err != nil {
 		err = fmt.Errorf("Unable to derive paywall address #%v "+
 			"for %v: %v", user.ID.ID(), user.Email, err)
 	}
 
-	return address, b.cfg.PaywallAmount, time.Now().Unix(), err
+	return address, p.cfg.PaywallAmount, time.Now().Unix(), err
 }
 
-func (b *backend) createUserPaywallPoolCopy() map[uuid.UUID]paywallPoolMember {
-	b.RLock()
-	defer b.RUnlock()
+func (p *politeiawww) createUserPaywallPoolCopy() map[uuid.UUID]paywallPoolMember {
+	p.RLock()
+	defer p.RUnlock()
 
-	poolCopy := make(map[uuid.UUID]paywallPoolMember, len(b.userPaywallPool))
+	poolCopy := make(map[uuid.UUID]paywallPoolMember, len(p.userPaywallPool))
 
-	for k, v := range b.userPaywallPool {
+	for k, v := range p.userPaywallPool {
 		poolCopy[k] = v
 	}
 
 	return poolCopy
 }
 
-func (b *backend) checkForUserPayments(pool map[uuid.UUID]paywallPoolMember) (bool, []uuid.UUID) {
+func (p *politeiawww) checkForUserPayments(pool map[uuid.UUID]paywallPoolMember) (bool, []uuid.UUID) {
 	var userIDsToRemove []uuid.UUID
 
 	for userID, poolMember := range pool {
-		user, err := b.db.UserGetById(userID)
+		user, err := p.db.UserGetById(userID)
 		if err != nil {
 			if err == database.ErrShutdown {
 				// The database is shutdown, so stop the thread.
@@ -131,7 +131,7 @@ func (b *backend) checkForUserPayments(pool map[uuid.UUID]paywallPoolMember) (bo
 
 		log.Tracef("Checking the user paywall address for user %v...", user.Email)
 
-		if b.HasUserPaid(user) {
+		if p.HasUserPaid(user) {
 			// The user could have been marked as paid by RouteVerifyUserPayment,
 			// so just remove him from the in-memory pool.
 			userIDsToRemove = append(userIDsToRemove, userID)
@@ -146,7 +146,7 @@ func (b *backend) checkForUserPayments(pool map[uuid.UUID]paywallPoolMember) (bo
 		}
 
 		tx, _, err := util.FetchTxWithBlockExplorers(poolMember.address, poolMember.amount,
-			poolMember.txNotBefore, b.cfg.MinConfirmationsRequired)
+			poolMember.txNotBefore, p.cfg.MinConfirmationsRequired)
 		if err != nil {
 			log.Errorf("cannot fetch tx: %v\n", err)
 			continue
@@ -154,7 +154,7 @@ func (b *backend) checkForUserPayments(pool map[uuid.UUID]paywallPoolMember) (bo
 
 		if tx != "" {
 			// Update the user in the database.
-			err = b.updateUserAsPaid(user, tx)
+			err = p.updateUserAsPaid(user, tx)
 			if err != nil {
 				if err == database.ErrShutdown {
 					// The database is shutdown, so stop the thread.
@@ -180,7 +180,7 @@ func (b *backend) checkForUserPayments(pool map[uuid.UUID]paywallPoolMember) (bo
 // paywall pool have received a payment.  If so, proposal credits are created
 // for the user, the user database is updated, and the user is removed from
 // the paywall pool.
-func (b *backend) checkForProposalPayments(pool map[uuid.UUID]paywallPoolMember) (bool, []uuid.UUID) {
+func (p *politeiawww) checkForProposalPayments(pool map[uuid.UUID]paywallPoolMember) (bool, []uuid.UUID) {
 	var userIDsToRemove []uuid.UUID
 
 	// In theory poolMember could be raced during this call. In practice
@@ -188,7 +188,7 @@ func (b *backend) checkForProposalPayments(pool map[uuid.UUID]paywallPoolMember)
 	// poolMembers from the pool while in the middle of polling poolMember
 	// addresses.
 	for userID, poolMember := range pool {
-		user, err := b.db.UserGetById(userID)
+		user, err := p.db.UserGetById(userID)
 		if err != nil {
 			if err == database.ErrShutdown {
 				// The database is shutdown, so stop the thread.
@@ -205,14 +205,14 @@ func (b *backend) checkForProposalPayments(pool map[uuid.UUID]paywallPoolMember)
 
 		log.Tracef("Checking proposal paywall address for user %v...", user.Email)
 
-		paywall := b.mostRecentProposalPaywall(user)
+		paywall := p.mostRecentProposalPaywall(user)
 		if paywallHasExpired(paywall.PollExpiry) {
 			userIDsToRemove = append(userIDsToRemove, userID)
 			log.Tracef("  removing from polling, poll has expired")
 			continue
 		}
 
-		tx, err := b.verifyProposalPayment(user)
+		tx, err := p.verifyProposalPayment(user)
 		if err != nil {
 			if err == database.ErrShutdown {
 				// The database is shutdown, so stop the thread.
@@ -225,7 +225,7 @@ func (b *backend) checkForProposalPayments(pool map[uuid.UUID]paywallPoolMember)
 
 		// Removed paywall from the in-memory pool if it has
 		// been marked as paid.
-		if !b.userHasValidProposalPaywall(user) {
+		if !p.userHasValidProposalPaywall(user) {
 			userIDsToRemove = append(userIDsToRemove, userID)
 			log.Tracef("  removing from polling, user just paid")
 		} else if tx != nil {
@@ -235,9 +235,9 @@ func (b *backend) checkForProposalPayments(pool map[uuid.UUID]paywallPoolMember)
 			poolMember.txAmount = tx.Amount
 			poolMember.txConfirmations = tx.Confirmations
 
-			b.Lock()
-			b.userPaywallPool[userID] = poolMember
-			b.Unlock()
+			p.Lock()
+			p.userPaywallPool[userID] = poolMember
+			p.Unlock()
 		}
 
 		time.Sleep(paywallCheckGap)
@@ -246,35 +246,35 @@ func (b *backend) checkForProposalPayments(pool map[uuid.UUID]paywallPoolMember)
 	return true, userIDsToRemove
 }
 
-func (b *backend) removeUsersFromPool(userIDsToRemove []uuid.UUID) {
-	b.Lock()
-	defer b.Unlock()
+func (p *politeiawww) removeUsersFromPool(userIDsToRemove []uuid.UUID) {
+	p.Lock()
+	defer p.Unlock()
 
 	for _, userID := range userIDsToRemove {
-		delete(b.userPaywallPool, userID)
+		delete(p.userPaywallPool, userID)
 	}
 }
 
-func (b *backend) checkForPayments() {
+func (p *politeiawww) checkForPayments() {
 	for {
 		// Removing pool members from the pool while in the middle of
 		// polling can cause a race to occur in checkForProposalPayments.
 
-		userPaywallsToCheck := b.createUserPaywallPoolCopy()
+		userPaywallsToCheck := p.createUserPaywallPoolCopy()
 
 		// Check new user payments.
-		shouldContinue, userIDsToRemove := b.checkForUserPayments(userPaywallsToCheck)
+		shouldContinue, userIDsToRemove := p.checkForUserPayments(userPaywallsToCheck)
 		if !shouldContinue {
 			return
 		}
-		b.removeUsersFromPool(userIDsToRemove)
+		p.removeUsersFromPool(userIDsToRemove)
 
 		// Check proposal payments.
-		shouldContinue, userIDsToRemove = b.checkForProposalPayments(userPaywallsToCheck)
+		shouldContinue, userIDsToRemove = p.checkForProposalPayments(userPaywallsToCheck)
 		if !shouldContinue {
 			return
 		}
-		b.removeUsersFromPool(userIDsToRemove)
+		p.removeUsersFromPool(userIDsToRemove)
 
 		time.Sleep(paywallCheckGap)
 	}
@@ -282,9 +282,9 @@ func (b *backend) checkForPayments() {
 
 // GenerateNewUserPaywall generates new paywall info, if necessary, and saves
 // it in the database.
-func (b *backend) GenerateNewUserPaywall(user *database.User) error {
+func (p *politeiawww) GenerateNewUserPaywall(user *database.User) error {
 	// Check that the paywall is enabled.
-	if !b.paywallIsEnabled() {
+	if !p.paywallIsEnabled() {
 		return nil
 	}
 
@@ -296,7 +296,7 @@ func (b *backend) GenerateNewUserPaywall(user *database.User) error {
 	}
 
 	if user.NewUserPaywallAddress == "" {
-		address, amount, txNotBefore, err := b.derivePaywallInfo(user)
+		address, amount, txNotBefore, err := p.derivePaywallInfo(user)
 		if err != nil {
 			return err
 		}
@@ -307,27 +307,27 @@ func (b *backend) GenerateNewUserPaywall(user *database.User) error {
 	}
 	user.NewUserPaywallPollExpiry = time.Now().Add(paywallExpiryDuration).Unix()
 
-	err := b.db.UserUpdate(*user)
+	err := p.db.UserUpdate(*user)
 	if err != nil {
 		return err
 	}
 
-	b.addUserToPaywallPoolLock(user, paywallTypeUser)
+	p.addUserToPaywallPoolLock(user, paywallTypeUser)
 	return nil
 }
 
 // ProcessVerifyUserPayment verifies that the provided transaction
 // meets the minimum requirements to mark the user as paid, and then does
 // that in the user database.
-func (b *backend) ProcessVerifyUserPayment(user *database.User, vupt v1.VerifyUserPayment) (*v1.VerifyUserPaymentReply, error) {
+func (p *politeiawww) ProcessVerifyUserPayment(user *database.User, vupt v1.VerifyUserPayment) (*v1.VerifyUserPaymentReply, error) {
 	var reply v1.VerifyUserPaymentReply
-	if b.HasUserPaid(user) {
+	if p.HasUserPaid(user) {
 		reply.HasPaid = true
 		return &reply, nil
 	}
 
 	if paywallHasExpired(user.NewUserPaywallPollExpiry) {
-		err := b.GenerateNewUserPaywall(user)
+		err := p.GenerateNewUserPaywall(user)
 		if err != nil {
 			return nil, err
 		}
@@ -339,7 +339,7 @@ func (b *backend) ProcessVerifyUserPayment(user *database.User, vupt v1.VerifyUs
 
 	tx, _, err := util.FetchTxWithBlockExplorers(user.NewUserPaywallAddress,
 		user.NewUserPaywallAmount, user.NewUserPaywallTxNotBefore,
-		b.cfg.MinConfirmationsRequired)
+		p.cfg.MinConfirmationsRequired)
 	if err != nil {
 		if err == util.ErrCannotVerifyPayment {
 			return nil, v1.UserError{
@@ -352,7 +352,7 @@ func (b *backend) ProcessVerifyUserPayment(user *database.User, vupt v1.VerifyUs
 	if tx != "" {
 		reply.HasPaid = true
 
-		err = b.updateUserAsPaid(user, tx)
+		err = p.updateUserAsPaid(user, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -364,34 +364,34 @@ func (b *backend) ProcessVerifyUserPayment(user *database.User, vupt v1.VerifyUs
 }
 
 // HasUserPaid checks that a user has paid the paywall
-func (b *backend) HasUserPaid(user *database.User) bool {
+func (p *politeiawww) HasUserPaid(user *database.User) bool {
 	// Return true when running unit tests
-	if b.test {
+	if p.test {
 		return true
 	}
 
 	// Return true if paywall is disabled
-	if !b.paywallIsEnabled() {
+	if !p.paywallIsEnabled() {
 		return true
 	}
 
 	return user.NewUserPaywallTx != ""
 }
 
-func (b *backend) addUsersToPaywallPool() error {
-	b.Lock()
-	defer b.Unlock()
+func (p *politeiawww) addUsersToPaywallPool() error {
+	p.Lock()
+	defer p.Unlock()
 
 	// Create the in-memory pool of all users who need to pay the paywall.
-	err := b.db.AllUsers(func(user *database.User) {
+	err := p.db.AllUsers(func(user *database.User) {
 		// Proposal paywalls
-		if b.userHasValidProposalPaywall(user) {
-			b.addUserToPaywallPool(user, paywallTypeProposal)
+		if p.userHasValidProposalPaywall(user) {
+			p.addUserToPaywallPool(user, paywallTypeProposal)
 			return
 		}
 
 		// User paywalls
-		if b.HasUserPaid(user) {
+		if p.HasUserPaid(user) {
 			return
 		}
 		if user.NewUserVerificationToken != nil {
@@ -401,30 +401,30 @@ func (b *backend) addUsersToPaywallPool() error {
 			return
 		}
 
-		b.addUserToPaywallPool(user, paywallTypeUser)
+		p.addUserToPaywallPool(user, paywallTypeUser)
 	})
 	if err != nil {
 		return err
 	}
 
-	log.Tracef("Adding %v users to paywall pool", len(b.userPaywallPool))
+	log.Tracef("Adding %v users to paywall pool", len(p.userPaywallPool))
 	return nil
 }
 
 // initPaywallCheck is intended to be called
-func (b *backend) initPaywallChecker() error {
-	if b.cfg.PaywallAmount == 0 {
+func (p *politeiawww) initPaywallChecker() error {
+	if p.cfg.PaywallAmount == 0 {
 		// Paywall not configured.
 		return nil
 	}
 
-	err := b.addUsersToPaywallPool()
+	err := p.addUsersToPaywallPool()
 	if err != nil {
 		return err
 	}
 
 	// Start the thread that checks for payments.
-	go b.checkForPayments()
+	go p.checkForPayments()
 	return nil
 }
 
@@ -433,7 +433,7 @@ func (b *backend) initPaywallChecker() error {
 // not guarantee that it is still valid.  Depending on the circumstances, the
 // paywall could have already been paid, could have already expired, or could
 // still be valid.
-func (b *backend) mostRecentProposalPaywall(user *database.User) *database.ProposalPaywall {
+func (p *politeiawww) mostRecentProposalPaywall(user *database.User) *database.ProposalPaywall {
 	if len(user.ProposalPaywalls) > 0 {
 		return &user.ProposalPaywalls[len(user.ProposalPaywalls)-1]
 	}
@@ -444,80 +444,80 @@ func (b *backend) mostRecentProposalPaywall(user *database.User) *database.Propo
 // that has not been paid yet and that has not expired yet.  Only one paywall
 // per user can be valid at a time, so if a valid paywall exists for the user,
 // it will be the most recent paywall.
-func (b *backend) userHasValidProposalPaywall(user *database.User) bool {
-	p := b.mostRecentProposalPaywall(user)
-	return p != nil && p.TxID == "" && !paywallHasExpired(p.PollExpiry)
+func (p *politeiawww) userHasValidProposalPaywall(user *database.User) bool {
+	pp := p.mostRecentProposalPaywall(user)
+	return pp != nil && pp.TxID == "" && !paywallHasExpired(pp.PollExpiry)
 }
 
 // generateProposalPaywall creates a new proposal paywall for the user that
 // enables them to purchase proposal credits.  Once the paywall is created, the
 // user database is updated and the user is added to the paywall pool.
-func (b *backend) generateProposalPaywall(user *database.User) (*database.ProposalPaywall, error) {
-	address, amount, txNotBefore, err := b.derivePaywallInfo(user)
+func (p *politeiawww) generateProposalPaywall(user *database.User) (*database.ProposalPaywall, error) {
+	address, amount, txNotBefore, err := p.derivePaywallInfo(user)
 	if err != nil {
 		return nil, err
 	}
-	p := database.ProposalPaywall{
+	pp := database.ProposalPaywall{
 		ID:          uint64(len(user.ProposalPaywalls) + 1),
 		CreditPrice: amount,
 		Address:     address,
 		TxNotBefore: txNotBefore,
 		PollExpiry:  time.Now().Add(paywallExpiryDuration).Unix(),
 	}
-	user.ProposalPaywalls = append(user.ProposalPaywalls, p)
+	user.ProposalPaywalls = append(user.ProposalPaywalls, pp)
 
-	err = b.db.UserUpdate(*user)
+	err = p.db.UserUpdate(*user)
 	if err != nil {
 		return nil, err
 	}
 
-	b.addUserToPaywallPool(user, paywallTypeProposal)
-	return &p, nil
+	p.addUserToPaywallPool(user, paywallTypeProposal)
+	return &pp, nil
 }
 
 // ProcessProposalPaywallDetails returns a proposal paywall that enables the
 // the user to purchase proposal credits. The user can only have one paywall
 // active at a time.  If no paywall currently exists, a new one is created and
 // the user is added to the paywall pool.
-func (b *backend) ProcessProposalPaywallDetails(user *database.User) (*v1.ProposalPaywallDetailsReply, error) {
+func (p *politeiawww) ProcessProposalPaywallDetails(user *database.User) (*v1.ProposalPaywallDetailsReply, error) {
 	log.Tracef("ProcessProposalPaywallDetails")
 
 	// Ensure paywall is enabled
-	if !b.paywallIsEnabled() {
+	if !p.paywallIsEnabled() {
 		return &v1.ProposalPaywallDetailsReply{}, nil
 	}
 
 	// Proposal paywalls cannot be generated until the user has paid their
 	// user registration fee.
-	if !b.HasUserPaid(user) {
+	if !p.HasUserPaid(user) {
 		return nil, v1.UserError{
 			ErrorCode: v1.ErrorStatusUserNotPaid,
 		}
 	}
 
-	var p *database.ProposalPaywall
-	if b.userHasValidProposalPaywall(user) {
+	var pp *database.ProposalPaywall
+	if p.userHasValidProposalPaywall(user) {
 		// Don't create a new paywall if a valid one already exists.
-		p = b.mostRecentProposalPaywall(user)
+		pp = p.mostRecentProposalPaywall(user)
 	} else {
 		// Create a new paywall.
 		var err error
-		p, err = b.generateProposalPaywall(user)
+		pp, err = p.generateProposalPaywall(user)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return &v1.ProposalPaywallDetailsReply{
-		CreditPrice:        p.CreditPrice,
-		PaywallAddress:     p.Address,
-		PaywallTxNotBefore: p.TxNotBefore,
+		CreditPrice:        pp.CreditPrice,
+		PaywallAddress:     pp.Address,
+		PaywallTxNotBefore: pp.TxNotBefore,
 	}, nil
 }
 
 // ProcessProposalPaywallPayment checks if the user has a pending paywall
 // payment and returns the payment details if one is found.
-func (b *backend) ProcessProposalPaywallPayment(user *database.User) (*v1.ProposalPaywallPaymentReply, error) {
+func (p *politeiawww) ProcessProposalPaywallPayment(user *database.User) (*v1.ProposalPaywallPaymentReply, error) {
 	log.Tracef("ProcessProposalPaywallPayment")
 
 	var (
@@ -526,10 +526,10 @@ func (b *backend) ProcessProposalPaywallPayment(user *database.User) (*v1.Propos
 		confirmations uint64
 	)
 
-	b.RLock()
-	defer b.RUnlock()
+	p.RLock()
+	defer p.RUnlock()
 
-	poolMember, ok := b.userPaywallPool[user.ID]
+	poolMember, ok := p.userPaywallPool[user.ID]
 	if ok {
 		txID = poolMember.txID
 		txAmount = poolMember.txAmount
@@ -546,8 +546,8 @@ func (b *backend) ProcessProposalPaywallPayment(user *database.User) (*v1.Propos
 // verifyPropoposalPayment checks whether a payment has been sent to the
 // user's proposal paywall address. Proposal credits are created and added to
 // the user's account if the payment meets the minimum requirements.
-func (b *backend) verifyProposalPayment(user *database.User) (*util.TxDetails, error) {
-	paywall := b.mostRecentProposalPaywall(user)
+func (p *politeiawww) verifyProposalPayment(user *database.User) (*util.TxDetails, error) {
+	paywall := p.mostRecentProposalPaywall(user)
 
 	// If a TxID exists, the payment has already been verified.
 	if paywall.TxID != "" {
@@ -568,7 +568,7 @@ func (b *backend) verifyProposalPayment(user *database.User) (*util.TxDetails, e
 			continue
 		case tx.Amount < paywall.CreditPrice:
 			continue
-		case tx.Confirmations < b.cfg.MinConfirmationsRequired:
+		case tx.Confirmations < p.cfg.MinConfirmationsRequired:
 			// Payment tx found but not enough confirmations. Return
 			// the tx so that the paywall member can be updated.
 			return &tx, nil
@@ -593,7 +593,7 @@ func (b *backend) verifyProposalPayment(user *database.User) (*util.TxDetails, e
 			user.UnspentProposalCredits = append(user.UnspentProposalCredits, c...)
 
 			// Update user database.
-			err = b.db.UserUpdate(*user)
+			err = p.db.UserUpdate(*user)
 			if err != nil {
 				return nil, fmt.Errorf("database UserUpdate: %v", err)
 			}
@@ -613,9 +613,9 @@ func ProposalCreditBalance(u *database.User) uint64 {
 
 // UserHasProposalCredits checks to see if the user has any unspent proposal
 // credits.
-func (b *backend) UserHasProposalCredits(u *database.User) bool {
+func (p *politeiawww) UserHasProposalCredits(u *database.User) bool {
 	// Return true when running unit tests or if paywall is disabled
-	if b.test || !b.paywallIsEnabled() {
+	if p.test || !p.paywallIsEnabled() {
 		return true
 	}
 	return ProposalCreditBalance(u) > 0
@@ -624,9 +624,9 @@ func (b *backend) UserHasProposalCredits(u *database.User) bool {
 // SpendProposalCredit updates an unspent proposal credit with the passed in
 // censorship token, moves the credit into the user's spent proposal credits
 // list, and then updates the user database.
-func (b *backend) SpendProposalCredit(u *database.User, token string) error {
+func (p *politeiawww) SpendProposalCredit(u *database.User, token string) error {
 	// Skip when running unit tests or if paywall is disabled.
-	if b.test || !b.paywallIsEnabled() {
+	if p.test || !p.paywallIsEnabled() {
 		return nil
 	}
 
@@ -641,6 +641,6 @@ func (b *backend) SpendProposalCredit(u *database.User, token string) error {
 	u.SpentProposalCredits = append(u.SpentProposalCredits, creditToSpend)
 	u.UnspentProposalCredits = u.UnspentProposalCredits[1:]
 
-	err := b.db.UserUpdate(*u)
+	err := p.db.UserUpdate(*u)
 	return err
 }
