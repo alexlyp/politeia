@@ -3,7 +3,7 @@ module github.com/decred/politeia
 require (
 	bou.ke/monkey v1.0.1 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
-	github.com/badoux/checkmail v0.0.0-20180430153108-0755fe2dc241
+	github.com/badoux/checkmail v0.0.0-20181210160741-9661bd69e9ad
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/dajohi/goemail v0.0.0-20190207191308-61faa215f94d
 	github.com/davecgh/go-spew v1.1.1
@@ -24,7 +24,6 @@ require (
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
-	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/google/go-cmp v0.2.0 // indirect
 	github.com/google/uuid v1.0.0
 	github.com/gorilla/csrf v1.5.1
@@ -40,15 +39,15 @@ require (
 	github.com/jrick/logrotate v1.0.0
 	github.com/lib/pq v1.0.0 // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
-	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/otiai10/copy v0.0.0-20180813032824-7e9a647135a1
-	github.com/otiai10/mint v1.2.1 // indirect
+	github.com/otiai10/curr v0.0.0-20150429015615-9b4961190c95 // indirect
+	github.com/otiai10/mint v1.2.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/robfig/cron v0.0.0-20180505203441-b41be1df6967
-	github.com/stretchr/testify v1.2.2 // indirect
+	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/subosito/norma v0.0.0-20140814002436-523a8b2df221
-	github.com/syndtr/goleveldb v0.0.0-20180815032940-ae2bd5eed72d
-	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
+	github.com/syndtr/goleveldb v1.0.0
+	golang.org/x/crypto v0.0.0-20190103213133-ff983b9c42bc
 	golang.org/x/net v0.0.0-20181207154023-610586996380
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	google.golang.org/grpc v1.17.0

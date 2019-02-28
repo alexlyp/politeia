@@ -546,3 +546,24 @@ func (p *politeiawww) emailUserLocked(email string) error {
 
 	return p.sendEmailTo(subject, body, email)
 }
+
+// emailInviteNewUserVerificationLink emails the link to invite a user to
+// join the Contractor Management System, if the email server is set up.
+func (p *politeiawww) emailInviteNewUserVerificationLink(email, token string) error {
+	if p.smtp.disabled {
+		return nil
+	}
+
+	tplData := newInviteUserEmailTemplateData{
+		Email: email,
+		Token: token,
+	}
+
+	subject := "Welcome to the Contractor Management System"
+	body, err := createBody(templateInviteNewUserEmail, &tplData)
+	if err != nil {
+		return err
+	}
+
+	return p.sendEmailTo(subject, body, email)
+}

@@ -61,7 +61,11 @@ const (
 	// }
 	dust = 60300
 
+	// Currently available modes to run politeia, by default piwww, is used.
 	politeiaWWWMode = "piwww"
+	cmsWWWMode      = "cmswww"
+
+	defaultWWWMode = politeiaWWWMode
 )
 
 var (
@@ -371,6 +375,7 @@ func loadConfig() (*config, []string, error) {
 		VoteDurationMin:          defaultVoteDurationMin,
 		VoteDurationMax:          defaultVoteDurationMax,
 		MailAddress:              defaultMailAddress,
+		Mode:                     defaultWWWMode,
 	}
 
 	// Service options which are only added on Windows.
@@ -482,6 +487,8 @@ func loadConfig() (*config, []string, error) {
 
 	// Verify mode
 	switch cfg.Mode {
+	case cmsWWWMode:
+		cfg.Mode = cmsWWWMode
 	case politeiaWWWMode:
 	default:
 		err := fmt.Errorf("invalid mode: %v", cfg.Mode)

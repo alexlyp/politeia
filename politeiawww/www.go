@@ -297,6 +297,7 @@ func (p *politeiawww) handleVersion(w http.ResponseWriter, r *http.Request) {
 		Route:   v1.PoliteiaWWWAPIRoute,
 		PubKey:  hex.EncodeToString(p.cfg.Identity.Key[:]),
 		TestNet: p.cfg.TestNet,
+		Mode:    p.cfg.Mode,
 	})
 	if err != nil {
 		RespondWithError(w, r, 0, "handleVersion: Marshal %v", err)
@@ -1674,6 +1675,56 @@ func (p *politeiawww) handleNotFound(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusNotFound, v1.ErrorReply{})
 }
 
+// handleInviteNewUser handles the invitation of a new contractor by an
+// administrator for the Contractor Management System.
+func (p *politeiawww) handleInviteNewUser(w http.ResponseWriter, r *http.Request) {
+	log.Tracef("handleInviteNewUser")
+
+	// Get the new user command.
+	var u v1.InviteNewUser
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&u); err != nil {
+		RespondWithError(w, r, 0, "handleInviteNewUser: unmarshal", v1.UserError{
+			ErrorCode: v1.ErrorStatusInvalidInput,
+		})
+		return
+	}
+
+	reply, err := p.ProcessInviteNewUser(u)
+	if err != nil {
+		RespondWithError(w, r, 0, "handleInviteNewUser: ProcessInviteNewUser %v", err)
+		return
+	}
+
+	// Reply with the verification token.
+	util.RespondWithJSON(w, http.StatusOK, reply)
+}
+
+// handleInviteNewUser handles the invitation of a new contractor by an
+// administrator for the Contractor Management System.
+func (p *politeiawww) handleRegisterUser(w http.ResponseWriter, r *http.Request) {
+	log.Tracef("handleRegister")
+
+	// Get the new user command.
+	var u v1.RegisterUser
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&u); err != nil {
+		RespondWithError(w, r, 0, "handleRegisterUser: unmarshal", v1.UserError{
+			ErrorCode: v1.ErrorStatusInvalidInput,
+		})
+		return
+	}
+
+	reply, err := p.ProcessRegisterUser(u)
+	if err != nil {
+		RespondWithError(w, r, 0, "handleRegisterUser: ProcessRegisterUser %v", err)
+		return
+	}
+
+	// Reply with the verification token.
+	util.RespondWithJSON(w, http.StatusOK, reply)
+}
+
 // addRoute sets up a handler for a specific method+route. If methos is not
 // specified it adds a websocket.
 func (p *politeiawww) addRoute(method string, route string, handler http.HandlerFunc, perm permission) {
@@ -1944,8 +1995,10 @@ func _main() error {
 	switch p.cfg.Mode {
 	case politeiaWWWMode:
 		p.setPoliteiaWWWRoutes()
+	case cmsWWWMode:
+		p.setCMSWWWRoutes()
 	default:
-		return fmt.Errorf("Unknown mode %v:", p.cfg.Mode)
+		return fmt.Errorf("unknown mode %v:", p.cfg.Mode)
 	}
 
 	// XXX setup user routes

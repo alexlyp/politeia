@@ -18,6 +18,8 @@ var (
 		template.New("user_locked_reset_password").Parse(templateUserLockedResetPasswordRaw))
 	templateUserPasswordChanged = template.Must(
 		template.New("user_changed_password").Parse(templateUserPasswordChangedRaw))
+	templateInviteNewUserEmail = template.Must(
+		template.New("invite_new_user_email_template").Parse(templateInviteNewUserEmailRaw))
 )
 
 func (p *politeiawww) setUserWWWRoutes() {
