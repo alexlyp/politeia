@@ -11,6 +11,8 @@ type PropVoteStatusT int
 type UserManageActionT int
 type EmailNotificationT int
 
+type InvoiceStatusT int
+
 const (
 	PoliteiaWWWAPIVersion = 1 // API version this backend understands
 
@@ -66,6 +68,7 @@ const (
 	// Contractor Management Routes
 	RouteInviteNewUser = "/invite"
 	RouteRegisterUser  = "/register"
+	RouteNewInvoice    = "/invoices/new"
 
 	// VerificationTokenSize is the size of verification token in bytes
 	VerificationTokenSize = 32
@@ -109,6 +112,14 @@ const (
 	// PolicyMaxCommentLength is the maximum number of characters
 	// accepted for comments
 	PolicyMaxCommentLength = 8000
+
+	// PolicyInvoiceCommentChar is the character which, when used as the first
+	// character of a line, denotes that entire line as a comment.
+	PolicyInvoiceCommentChar rune = '#'
+
+	// PolicyInvoiceFieldDelimiterChar is the character that delimits field
+	// values for each line item in the CSV.
+	PolicyInvoiceFieldDelimiterChar rune = ','
 
 	// ProposalListPageSize is the maximum number of proposals returned
 	// for the routes that return lists of proposals
@@ -179,6 +190,10 @@ const (
 	ErrorStatusInvalidLikeCommentAction    ErrorStatusT = 57
 	ErrorStatusInvalidCensorshipToken      ErrorStatusT = 58
 
+	// CMS Errors
+
+	ErrorStatusMalformedInvoiceFile ErrorStatusT = 59
+
 	// Proposal state codes
 	//
 	// PropStateUnvetted includes proposals with a status of:
@@ -237,6 +252,16 @@ const (
 	NotificationEmailAdminProposalVoteAuthorized EmailNotificationT = 1 << 6
 	NotificationEmailCommentOnMyProposal         EmailNotificationT = 1 << 7
 	NotificationEmailCommentOnMyComment          EmailNotificationT = 1 << 8
+
+	// Invoice status codes
+	InvoiceStatusInvalid  InvoiceStatusT = 0 // Invalid status
+	InvoiceStatusNotFound InvoiceStatusT = 1 // Invoice not found
+	InvoiceStatusNew      InvoiceStatusT = 2 // Invoice has not been reviewed
+	InvoiceStatusUpdated  InvoiceStatusT = 3 // Invoice has unreviewed changes
+	InvoiceStatusDisputed InvoiceStatusT = 4 // Invoice has been disputed for some reason
+	InvoiceStatusRejected InvoiceStatusT = 5 // Invoice fully rejected and closed
+	InvoiceStatusApproved InvoiceStatusT = 6 // Invoice has been approved
+	InvoiceStatusPaid     InvoiceStatusT = 7 // Invoice has been paid
 )
 
 var (
@@ -687,7 +712,7 @@ type ProposalPaywallDetailsReply struct {
 }
 
 // ProposalPaywallPayment is used to request payment details for a pending
-// propsoal paywall payment.
+// proposal paywall payment.
 type ProposalPaywallPayment struct{}
 
 // ProposalPaywallPaymentReply is used to reply to the ProposalPaywallPayment
@@ -1185,3 +1210,34 @@ type RegisterUser struct {
 
 // RegisterUserReply replies to Register with no properties, if successful.
 type RegisterUserReply struct{}
+
+// NewInvoice attempts to submit a new invoice.
+type NewInvoice struct {
+	Month     uint16 `json:"month"`
+	Year      uint16 `json:"year"`
+	Files     []File `json:"files"`     // Invoice file and any attachments along with it
+	PublicKey string `json:"publickey"` // Key used to verify signature
+	Signature string `json:"signature"` // Signature of file hash
+}
+
+// NewInvoiceReply is used to reply to the NewInvoiceReply command.
+type NewInvoiceReply struct {
+	CensorshipRecord CensorshipRecord `json:"censorshiprecord"`
+}
+
+// InvoiceRecord is an entire invoice and its content.
+type InvoiceRecord struct {
+	Status             InvoiceStatusT `json:"status"`                       // Current status of invoice
+	StatusChangeReason string         `json:"statuschangereason,omitempty"` // Reason (if any) for the current status
+	Timestamp          int64          `json:"timestamp"`                    // Last update of invoice
+	Month              uint16         `json:"month"`                        // The month that this invoice applies to
+	Year               uint16         `json:"year"`                         // The year that this invoice applies to
+	UserID             string         `json:"userid"`                       // ID of user who submitted invoice
+	Username           string         `json:"username"`                     // Username of user who submitted invoice
+	PublicKey          string         `json:"publickey"`                    // User's public key, used to verify signature.
+	Signature          string         `json:"signature"`                    // Signature of file digest
+	Files              []File         `json:"file"`                         // Actual invoice file
+	Version            string         `json:"version"`                      // Record version
+
+	CensorshipRecord CensorshipRecord `json:"censorshiprecord"`
+}

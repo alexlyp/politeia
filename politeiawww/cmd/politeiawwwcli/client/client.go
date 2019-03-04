@@ -658,6 +658,30 @@ func (c *Client) EditProposal(ep *v1.EditProposal) (*v1.EditProposalReply, error
 	return &epr, nil
 }
 
+// NewInvoice submits the specified invoice to politeiawww for the logged in
+// user.
+func (c *Client) NewInvoice(ni *v1.NewInvoice) (*v1.NewInvoiceReply, error) {
+	responseBody, err := c.makeRequest("POST", v1.RouteNewInvoice, ni)
+	if err != nil {
+		return nil, err
+	}
+
+	var nir v1.NewInvoiceReply
+	err = json.Unmarshal(responseBody, &nir)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal NewInvoiceReply: %v", err)
+	}
+
+	if c.cfg.Verbose {
+		err := prettyPrintJSON(nir)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &nir, nil
+}
+
 // ProposalDetails retrieves the specified proposal.
 func (c *Client) ProposalDetails(token string, pd *v1.ProposalsDetails) (*v1.ProposalDetailsReply, error) {
 	responseBody, err := c.makeRequest("GET", "/proposals/"+token, pd)

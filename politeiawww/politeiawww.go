@@ -1103,6 +1103,8 @@ func (p *politeiawww) setCMSWWWRoutes() {
 	// Routes that require being logged in.
 	p.addRoute(http.MethodPost, v1.RouteNewComment,
 		p.handleNewComment, permissionLogin)
+	p.addRoute(http.MethodPost, v1.RouteNewInvoice,
+		p.handleNewInvoice, permissionLogin)
 
 	// Unauthenticated websocket
 	p.addRoute("", v1.RouteUnauthenticatedWebSocket,

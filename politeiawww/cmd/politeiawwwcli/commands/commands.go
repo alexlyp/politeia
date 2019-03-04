@@ -46,6 +46,11 @@ var (
 	// 'before' and 'after' are used at the same time.
 	errInvalidBeforeAfterUsage = errors.New("the 'before' and 'after' flags " +
 		"cannot be used at the same time")
+
+	// errInvoiceCSVNotFound is emitted when a invoice csv file
+	// is required but has not been passed into the command.
+	errInvoiceCSVNotFound = errors.New("invoice csv file not found.  " +
+		"You must either provide a csv file or use the --random flag.")
 )
 
 // Cmds is used to represent all of the politeiawwwcli commands.
@@ -65,6 +70,7 @@ type Cmds struct {
 	Login              LoginCmd              `command:"login" description:"(public) login to Politeia"`
 	Logout             LogoutCmd             `command:"logout" description:"(public) logout of Politeia"`
 	Me                 MeCmd                 `command:"me" description:"(user)   get user details for the logged in user"`
+	NewInvoice         NewInvoiceCmd         `command:"newinvoice" description:"(user)   create a new invoice"`
 	NewProposal        NewProposalCmd        `command:"newproposal" description:"(user)   create a new proposal"`
 	NewComment         NewCommentCmd         `command:"newcomment" description:"(user)   create a new proposal comment"`
 	NewUser            NewUserCmd            `command:"newuser" description:"(public) create a new user"`

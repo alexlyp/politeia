@@ -468,3 +468,39 @@ func convertPluginFromPD(p pd.Plugin) Plugin {
 		Settings: ps,
 	}
 }
+
+func convertInvoiceFileFromWWW(f *www.File) []pd.File {
+	return []pd.File{{
+		Name:    "invoice.csv",
+		MIME:    "text/plain; charset=utf-8",
+		Digest:  f.Digest,
+		Payload: f.Payload,
+	}}
+}
+
+func convertInvoiceCensorFromWWW(f www.CensorshipRecord) pd.CensorshipRecord {
+	return pd.CensorshipRecord{
+		Token:     f.Token,
+		Merkle:    f.Merkle,
+		Signature: f.Signature,
+	}
+}
+
+func convertInvoiceFileFromPD(files []pd.File) *www.File {
+	if len(files) == 0 {
+		return nil
+	}
+
+	return &www.File{
+		Digest:  files[0].Digest,
+		Payload: files[0].Payload,
+	}
+}
+
+func convertInvoiceCensorFromPD(f pd.CensorshipRecord) www.CensorshipRecord {
+	return www.CensorshipRecord{
+		Token:     f.Token,
+		Merkle:    f.Merkle,
+		Signature: f.Signature,
+	}
+}
