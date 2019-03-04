@@ -1725,6 +1725,37 @@ func (p *politeiawww) handleRegisterUser(w http.ResponseWriter, r *http.Request)
 	util.RespondWithJSON(w, http.StatusOK, reply)
 }
 
+// handleNewInvoice handles the incoming new invoice command.
+func (p *politeiawww) handleNewInvoice(w http.ResponseWriter, r *http.Request) {
+	// Get the new proposal command.
+	log.Tracef("handleNewInvoice")
+	var ni v1.NewInvoice
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&ni); err != nil {
+		RespondWithError(w, r, 0, "handleNewInvoice: unmarshal", v1.UserError{
+			ErrorCode: v1.ErrorStatusInvalidInput,
+		})
+		return
+	}
+
+	user, err := p.getSessionUser(w, r)
+	if err != nil {
+		RespondWithError(w, r, 0,
+			"handleNewInvoice: getSessionUser %v", err)
+		return
+	}
+
+	reply, err := p.ProcessNewInvoice(ni, user)
+	if err != nil {
+		RespondWithError(w, r, 0,
+			"handleNewInvoice: ProcessNewInvoice %v", err)
+		return
+	}
+
+	// Reply with the challenge response and censorship token.
+	util.RespondWithJSON(w, http.StatusOK, reply)
+}
+
 // addRoute sets up a handler for a specific method+route. If methos is not
 // specified it adds a websocket.
 func (p *politeiawww) addRoute(method string, route string, handler http.HandlerFunc, perm permission) {

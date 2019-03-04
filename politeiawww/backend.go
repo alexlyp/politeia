@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -36,6 +37,9 @@ const (
 	// indexFile contains the file name of the index file
 	indexFile = "index.md"
 
+	// invoiceFile contains the file name of the invoice file
+	invoiceFile = "invoice.csv"
+
 	// mdStream* indicate the metadata stream used for various types
 	mdStreamGeneral = 0 // General information for this proposal
 	mdStreamChanges = 2 // Changes to record
@@ -44,6 +48,7 @@ const (
 
 	VersionMDStreamChanges         = 1
 	BackendProposalMetadataVersion = 1
+	BackendInvoiceMetadataVersion  = 1
 
 	LoginAttemptsToLockUser = 5
 
@@ -66,6 +71,14 @@ type loginReplyWithError struct {
 
 type BackendProposalMetadata struct {
 	Version   uint64 `json:"version"`   // BackendProposalMetadata version
+	Timestamp int64  `json:"timestamp"` // Last update of proposal
+	Name      string `json:"name"`      // Generated proposal name
+	PublicKey string `json:"publickey"` // Key used for signature.
+	Signature string `json:"signature"` // Signature of merkle root
+}
+
+type BackendInvoiceMetadata struct {
+	Version   uint64 `json:"version"`   // BackendInvoiceMetadata version
 	Timestamp int64  `json:"timestamp"` // Last update of proposal
 	Name      string `json:"name"`      // Generated proposal name
 	PublicKey string `json:"publickey"` // Key used for signature.
@@ -150,6 +163,30 @@ func decodeMDStreamChanges(payload []byte) ([]MDStreamChanges, error) {
 	}
 
 	return msc, nil
+}
+
+// encodeBackendInvoiceMetadata encodes BackendInvoiceMetadata into a JSON
+// byte slice.
+func encodeBackendInvoiceMetadata(md BackendInvoiceMetadata) ([]byte, error) {
+	b, err := json.Marshal(md)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// decodeBackendInvoiceMetadata decodes a JSON byte slice into a
+// BackendInvoiceMetadata.
+func decodeBackendInvoiceMetadata(payload []byte) (*BackendInvoiceMetadata, error) {
+	var md BackendInvoiceMetadata
+
+	err := json.Unmarshal(payload, &md)
+	if err != nil {
+		return nil, err
+	}
+
+	return &md, nil
 }
 
 // checkPublicKeyAndSignature validates the public key and signature.
@@ -713,6 +750,163 @@ func validateProposal(np www.NewProposal, u *user.User) error {
 		return www.UserError{
 			ErrorCode:    www.ErrorStatusProposalInvalidTitle,
 			ErrorContext: []string{util.CreateProposalNameRegex()},
+		}
+	}
+
+	// Note that we need validate the string representation of the merkle
+	mr := merkle.Root(hashes)
+	if !pk.VerifyMessage([]byte(hex.EncodeToString(mr[:])), sig) {
+		return www.UserError{
+			ErrorCode: www.ErrorStatusInvalidSignature,
+		}
+	}
+
+	return nil
+}
+func validateInvoice(ni www.NewInvoice, user *database.User) error {
+	log.Tracef("validateInvoice")
+
+	// Obtain signature
+	sig, err := util.ConvertSignature(ni.Signature)
+	if err != nil {
+		return www.UserError{
+			ErrorCode: www.ErrorStatusInvalidSignature,
+		}
+	}
+
+	// Verify public key
+	id, err := checkPublicKey(user, ni.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	pk, err := identity.PublicIdentityFromBytes(id[:])
+	if err != nil {
+		return err
+	}
+
+	// Check for at least 1 markdown file with a non-empty payload.
+	if len(ni.Files) == 0 || ni.Files[0].Payload == "" {
+		return www.UserError{
+			ErrorCode: www.ErrorStatusProposalMissingFiles,
+		}
+	}
+
+	// verify if there are duplicate names
+	filenames := make(map[string]int, len(ni.Files))
+	// Check that the file number policy is followed.
+	var (
+		numCSVs, numImages, numInvoiceFiles    int
+		csvExceedsMaxSize, imageExceedsMaxSize bool
+		hashes                                 []*[sha256.Size]byte
+	)
+	for _, v := range ni.Files {
+		filenames[v.Name]++
+		var (
+			data []byte
+			err  error
+		)
+		if strings.HasPrefix(v.MIME, "image/") {
+			numImages++
+			data, err = base64.StdEncoding.DecodeString(v.Payload)
+			if err != nil {
+				return err
+			}
+			if len(data) > www.PolicyMaxImageSize {
+				imageExceedsMaxSize = true
+			}
+		} else {
+			numCSVs++
+
+			if v.Name == invoiceFile {
+				numInvoiceFiles++
+			}
+
+			data, err = base64.StdEncoding.DecodeString(v.Payload)
+			if err != nil {
+				return err
+			}
+			if len(data) > www.PolicyMaxMDSize {
+				csvExceedsMaxSize = true
+			}
+
+			// Validate that the invoice shows the month and date in a comment.
+			t := time.Date(int(ni.Year), time.Month(int(ni.Month)), 1, 0, 0, 0, 0, time.UTC)
+			str := fmt.Sprintf("%v %v", www.PolicyInvoiceCommentChar,
+				t.Format("2006-01"))
+			if strings.HasPrefix(string(data), str) ||
+				strings.Contains(string(data), "\n"+str) {
+				return www.UserError{
+					ErrorCode: www.ErrorStatusMalformedInvoiceFile,
+				}
+			}
+
+			// Validate that the invoice is CSV-formatted.
+			csvReader := csv.NewReader(strings.NewReader(string(data)))
+			csvReader.Comma = www.PolicyInvoiceFieldDelimiterChar
+			csvReader.Comment = www.PolicyInvoiceCommentChar
+			csvReader.TrimLeadingSpace = true
+
+			_, err = csvReader.ReadAll()
+			if err != nil {
+				return www.UserError{
+					ErrorCode: www.ErrorStatusMalformedInvoiceFile,
+				}
+			}
+		}
+
+		// Append digest to array for merkle root calculation
+		digest := util.Digest(data)
+		var d [sha256.Size]byte
+		copy(d[:], digest)
+		hashes = append(hashes, &d)
+	}
+
+	// verify duplicate file names
+	if len(ni.Files) > 1 {
+		var repeated []string
+		for name, count := range filenames {
+			if count > 1 {
+				repeated = append(repeated, name)
+			}
+		}
+		if len(repeated) > 0 {
+			return www.UserError{
+				ErrorCode:    www.ErrorStatusProposalDuplicateFilenames,
+				ErrorContext: repeated,
+			}
+		}
+	}
+
+	// we expect one index file
+	if numInvoiceFiles == 0 {
+		return www.UserError{
+			ErrorCode:    www.ErrorStatusProposalMissingFiles,
+			ErrorContext: []string{indexFile},
+		}
+	}
+
+	if numCSVs > www.PolicyMaxMDs {
+		return www.UserError{
+			ErrorCode: www.ErrorStatusMaxMDsExceededPolicy,
+		}
+	}
+
+	if numImages > www.PolicyMaxImages {
+		return www.UserError{
+			ErrorCode: www.ErrorStatusMaxImagesExceededPolicy,
+		}
+	}
+
+	if csvExceedsMaxSize {
+		return www.UserError{
+			ErrorCode: www.ErrorStatusMaxMDSizeExceededPolicy,
+		}
+	}
+
+	if imageExceedsMaxSize {
+		return www.UserError{
+			ErrorCode: www.ErrorStatusMaxImageSizeExceededPolicy,
 		}
 	}
 
