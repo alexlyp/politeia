@@ -9,7 +9,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/politeia/politeiad/cache"
 	v1 "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
+	"github.com/decred/politeia/politeiawww/user"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -68,7 +68,7 @@ type politeiawww struct {
 	// XXX This needs to be abstracted away
 	sync.RWMutex // XXX This needs to be the first entry in struct
 
-	db           database.Database // User database
+	db           user.Database // User database XXX GOT TO GO
 	params       *chaincfg.Params
 	eventManager *EventManager
 

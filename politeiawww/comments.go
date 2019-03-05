@@ -16,7 +16,7 @@ import (
 	pd "github.com/decred/politeia/politeiad/api/v1"
 	"github.com/decred/politeia/politeiad/cache"
 	www "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
+	"github.com/decred/politeia/politeiawww/user"
 	"github.com/decred/politeia/util"
 )
 
@@ -147,18 +147,18 @@ func validateComment(c www.NewComment) error {
 
 // ProcessNewComment sends a new comment decred plugin command to politeaid
 // then fetches the new comment from the cache and returns it.
-func (p *politeiawww) ProcessNewComment(nc www.NewComment, user *database.User) (*www.NewCommentReply, error) {
-	log.Tracef("ProcessNewComment: %v %v", nc.Token, user.ID)
+func (p *politeiawww) ProcessNewComment(nc www.NewComment, u *user.User) (*www.NewCommentReply, error) {
+	log.Tracef("ProcessNewComment: %v %v", nc.Token, u.ID)
 
 	// Pay up sucker!
-	if !p.HasUserPaid(user) {
+	if !p.HasUserPaid(u) {
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusUserNotPaid,
 		}
 	}
 
 	// Verify authenticity
-	err := checkPublicKeyAndSignature(user, nc.PublicKey, nc.Signature,
+	err := checkPublicKeyAndSignature(u, nc.PublicKey, nc.Signature,
 		nc.Token, nc.ParentID, nc.Comment)
 	if err != nil {
 		return nil, err
@@ -273,18 +273,18 @@ func (p *politeiawww) ProcessNewComment(nc www.NewComment, user *database.User) 
 }
 
 // ProcessLikeComment processes an upvote/downvote on a comment.
-func (p *politeiawww) ProcessLikeComment(lc www.LikeComment, user *database.User) (*www.LikeCommentReply, error) {
-	log.Debugf("ProcessLikeComment: %v %v %v", lc.Token, lc.CommentID, user.ID)
+func (p *politeiawww) ProcessLikeComment(lc www.LikeComment, u *user.User) (*www.LikeCommentReply, error) {
+	log.Debugf("ProcessLikeComment: %v %v %v", lc.Token, lc.CommentID, u.ID)
 
 	// Pay up sucker!
-	if !p.HasUserPaid(user) {
+	if !p.HasUserPaid(u) {
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusUserNotPaid,
 		}
 	}
 
 	// Verify authenticity
-	err := checkPublicKeyAndSignature(user, lc.PublicKey, lc.Signature,
+	err := checkPublicKeyAndSignature(u, lc.PublicKey, lc.Signature,
 		lc.Token, lc.CommentID, lc.Action)
 	if err != nil {
 		return nil, err
@@ -410,11 +410,11 @@ func (p *politeiawww) ProcessLikeComment(lc www.LikeComment, user *database.User
 
 // ProcessCensorComment sends a censor comment decred plugin command to
 // politeiad then returns the censor comment receipt.
-func (p *politeiawww) ProcessCensorComment(cc www.CensorComment, user *database.User) (*www.CensorCommentReply, error) {
+func (p *politeiawww) ProcessCensorComment(cc www.CensorComment, u *user.User) (*www.CensorCommentReply, error) {
 	log.Tracef("ProcessCensorComment: %v: %v", cc.Token, cc.CommentID)
 
 	// Verify authenticity
-	err := checkPublicKeyAndSignature(user, cc.PublicKey, cc.Signature,
+	err := checkPublicKeyAndSignature(u, cc.PublicKey, cc.Signature,
 		cc.Token, cc.CommentID, cc.Reason)
 	if err != nil {
 		return nil, err

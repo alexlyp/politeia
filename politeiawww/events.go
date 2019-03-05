@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	v1 "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
+	"github.com/decred/politeia/politeiawww/user"
 )
 
 // EventT is the type of event.
@@ -36,13 +36,13 @@ const (
 type EventDataProposalSubmitted struct {
 	CensorshipRecord *v1.CensorshipRecord
 	ProposalName     string
-	User             *database.User
+	User             *user.User
 }
 
 type EventDataProposalStatusChange struct {
 	Proposal          *v1.ProposalRecord
 	SetProposalStatus *v1.SetProposalStatus
-	AdminUser         *database.User
+	AdminUser         *user.User
 }
 
 type EventDataProposalEdited struct {
@@ -50,13 +50,13 @@ type EventDataProposalEdited struct {
 }
 
 type EventDataProposalVoteStarted struct {
-	AdminUser *database.User
+	AdminUser *user.User
 	StartVote *v1.StartVote
 }
 
 type EventDataProposalVoteAuthorized struct {
 	AuthorizeVote *v1.AuthorizeVote
-	User          *database.User
+	User          *user.User
 }
 
 type EventDataComment struct {
@@ -64,12 +64,12 @@ type EventDataComment struct {
 }
 
 type EventDataUserManage struct {
-	AdminUser  *database.User
-	User       *database.User
+	AdminUser  *user.User
+	User       *user.User
 	ManageUser *v1.ManageUser
 }
 
-func (p *politeiawww) _getProposalAuthor(proposal *v1.ProposalRecord) (*database.User, error) {
+func (p *politeiawww) _getProposalAuthor(proposal *v1.ProposalRecord) (*user.User, error) {
 	if proposal.UserId == "" {
 		proposal.UserId = p.userPubkeys[proposal.PublicKey]
 	}
@@ -87,14 +87,14 @@ func (p *politeiawww) _getProposalAuthor(proposal *v1.ProposalRecord) (*database
 	return author, nil
 }
 
-func (p *politeiawww) getProposalAuthor(proposal *v1.ProposalRecord) (*database.User, error) {
+func (p *politeiawww) getProposalAuthor(proposal *v1.ProposalRecord) (*user.User, error) {
 	p.RLock()
 	defer p.RUnlock()
 
 	return p._getProposalAuthor(proposal)
 }
 
-func (p *politeiawww) getProposalAndAuthor(token string) (*v1.ProposalRecord, *database.User, error) {
+func (p *politeiawww) getProposalAndAuthor(token string) (*v1.ProposalRecord, *user.User, error) {
 	proposal, err := p.getProp(token)
 	if err != nil {
 		return nil, nil, err

@@ -16,7 +16,7 @@ import (
 	pd "github.com/decred/politeia/politeiad/api/v1"
 	"github.com/decred/politeia/politeiad/cache"
 	www "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
+	"github.com/decred/politeia/politeiawww/user"
 	"github.com/decred/politeia/util"
 )
 
@@ -350,7 +350,7 @@ func (p *politeiawww) getPropComments(token string) ([]www.Comment, error) {
 }
 
 // ProcessNewProposal tries to submit a new proposal to politeiad.
-func (p *politeiawww) ProcessNewProposal(np www.NewProposal, user *database.User) (*www.NewProposalReply, error) {
+func (p *politeiawww) ProcessNewProposal(np www.NewProposal, user *user.User) (*www.NewProposalReply, error) {
 	log.Tracef("ProcessNewProposal")
 
 	if !p.HasUserPaid(user) {
@@ -466,7 +466,7 @@ func (p *politeiawww) ProcessNewProposal(np www.NewProposal, user *database.User
 
 // ProcessProposalDetails fetches a specific proposal version from the records
 // cache and returns it.
-func (p *politeiawww) ProcessProposalDetails(propDetails www.ProposalsDetails, user *database.User) (*www.ProposalDetailsReply, error) {
+func (p *politeiawww) ProcessProposalDetails(propDetails www.ProposalsDetails, user *user.User) (*www.ProposalDetailsReply, error) {
 	log.Tracef("ProcessProposalDetails")
 
 	// Version is an optional query param. Fetch latest version
@@ -517,10 +517,10 @@ func (p *politeiawww) ProcessProposalDetails(propDetails www.ProposalsDetails, u
 }
 
 // ProcessSetProposalStatus changes the status of an existing proposal.
-func (p *politeiawww) ProcessSetProposalStatus(sps www.SetProposalStatus, user *database.User) (*www.SetProposalStatusReply, error) {
+func (p *politeiawww) ProcessSetProposalStatus(sps www.SetProposalStatus, u *user.User) (*www.SetProposalStatusReply, error) {
 	log.Tracef("ProcessSetProposalStatus %v", sps.Token)
 
-	err := checkPublicKeyAndSignature(user, sps.PublicKey, sps.Signature,
+	err := checkPublicKeyAndSignature(u, sps.PublicKey, sps.Signature,
 		sps.Token, strconv.FormatUint(uint64(sps.ProposalStatus), 10),
 		sps.StatusChangeMessage)
 	if err != nil {
@@ -539,9 +539,9 @@ func (p *politeiawww) ProcessSetProposalStatus(sps www.SetProposalStatus, user *
 
 	// Ensure user is an admin. Only admins are allowed to change
 	// a proposal status.
-	adminPubKey, ok := database.ActiveIdentityString(user.Identities)
+	adminPubKey, ok := user.ActiveIdentityString(u.Identities)
 	if !ok {
-		return nil, fmt.Errorf("invalid admin identity: %v", user.ID)
+		return nil, fmt.Errorf("invalid admin identity: %v", u.ID)
 	}
 
 	// Handle test case
@@ -571,7 +571,7 @@ func (p *politeiawww) ProcessSetProposalStatus(sps www.SetProposalStatus, user *
 				"proposal %v", pr.PublicKey, pr.CensorshipRecord.Token)
 		}
 
-		if authorID == user.ID.String() {
+		if authorID == u.ID.String() {
 			return nil, www.UserError{
 				ErrorCode: www.ErrorStatusReviewerAdminEqualsAuthor,
 			}
@@ -720,7 +720,7 @@ func (p *politeiawww) ProcessSetProposalStatus(sps www.SetProposalStatus, user *
 	p.eventManager._fireEvent(EventTypeProposalStatusChange,
 		EventDataProposalStatusChange{
 			Proposal:          updatedProp,
-			AdminUser:         user,
+			AdminUser:         u,
 			SetProposalStatus: &sps,
 		},
 	)
@@ -731,7 +731,7 @@ func (p *politeiawww) ProcessSetProposalStatus(sps www.SetProposalStatus, user *
 }
 
 // ProcessEditProposal attempts to edit a proposal on politeiad.
-func (p *politeiawww) ProcessEditProposal(ep www.EditProposal, user *database.User) (*www.EditProposalReply, error) {
+func (p *politeiawww) ProcessEditProposal(ep www.EditProposal, u *user.User) (*www.EditProposalReply, error) {
 	log.Tracef("ProcessEditProposal %v", ep.Token)
 
 	// Validate proposal status
@@ -753,7 +753,7 @@ func (p *politeiawww) ProcessEditProposal(ep www.EditProposal, user *database.Us
 	}
 
 	// Ensure user is the proposal author
-	if cachedProp.UserId != user.ID.String() {
+	if cachedProp.UserId != u.ID.String() {
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusUserNotAuthor,
 		}
@@ -785,7 +785,7 @@ func (p *politeiawww) ProcessEditProposal(ep www.EditProposal, user *database.Us
 		PublicKey: ep.PublicKey,
 		Signature: ep.Signature,
 	}
-	err = validateProposal(np, user)
+	err = validateProposal(np, u)
 	if err != nil {
 		return nil, err
 	}
@@ -978,7 +978,7 @@ func (p *politeiawww) ProcessProposalsStats() (*www.ProposalsStatsReply, error) 
 // ProcessCommentsGet returns all comments for a given proposal. If the user is
 // logged in the user's last access time for the given comments will also be
 // returned.
-func (p *politeiawww) ProcessCommentsGet(token string, user *database.User) (*www.GetCommentsReply, error) {
+func (p *politeiawww) ProcessCommentsGet(token string, u *user.User) (*www.GetCommentsReply, error) {
 	log.Tracef("ProcessCommentGet: %v", token)
 
 	// Fetch proposal comments from cache
@@ -990,13 +990,13 @@ func (p *politeiawww) ProcessCommentsGet(token string, user *database.User) (*ww
 	// Get the last time the user accessed these comments. This is
 	// a public route so a user may not exist.
 	var accessTime int64
-	if user != nil {
-		if user.ProposalCommentsAccessTimes == nil {
-			user.ProposalCommentsAccessTimes = make(map[string]int64)
+	if u != nil {
+		if u.ProposalCommentsAccessTimes == nil {
+			u.ProposalCommentsAccessTimes = make(map[string]int64)
 		}
-		accessTime = user.ProposalCommentsAccessTimes[token]
-		user.ProposalCommentsAccessTimes[token] = time.Now().Unix()
-		err = p.db.UserUpdate(*user)
+		accessTime = u.ProposalCommentsAccessTimes[token]
+		u.ProposalCommentsAccessTimes[token] = time.Now().Unix()
+		err = p.db.UserUpdate(*u)
 		if err != nil {
 			return nil, err
 		}

@@ -25,7 +25,7 @@ import (
 	"github.com/decred/politeia/politeiad/api/v1/mime"
 	"github.com/decred/politeia/politeiad/cache"
 	www "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
+	"github.com/decred/politeia/politeiawww/user"
 	"github.com/decred/politeia/util"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -148,8 +148,8 @@ func decodeMDStreamChanges(payload []byte) ([]MDStreamChanges, error) {
 }
 
 // checkPublicKeyAndSignature validates the public key and signature.
-func checkPublicKeyAndSignature(user *database.User, publicKey string, signature string, elements ...string) error {
-	id, err := checkPublicKey(user, publicKey)
+func checkPublicKeyAndSignature(u *user.User, publicKey string, signature string, elements ...string) error {
+	id, err := checkPublicKey(u, publicKey)
 	if err != nil {
 		return err
 	}
@@ -159,8 +159,8 @@ func checkPublicKeyAndSignature(user *database.User, publicKey string, signature
 
 // checkPublicKey compares the supplied public key against the one stored in
 // the user database. It will return the active identity if there are no errors.
-func checkPublicKey(user *database.User, pk string) ([]byte, error) {
-	id, ok := database.ActiveIdentity(user.Identities)
+func checkPublicKey(u *user.User, pk string) ([]byte, error) {
+	id, ok := user.ActiveIdentity(u.Identities)
 	if !ok {
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusNoPublicKey,
@@ -272,19 +272,19 @@ func (p *politeiawww) getUsernameById(userIdStr string) string {
 		return ""
 	}
 
-	user, err := p.db.UserGetById(userId)
+	u, err := p.db.UserGetById(userId)
 	if err != nil {
 		return ""
 	}
 
-	return user.Username
+	return u.Username
 }
 
 func (p *politeiawww) login(l *www.Login) loginReplyWithError {
 	// Get user from db.
-	user, err := p.db.UserGet(l.Email)
+	u, err := p.db.UserGet(l.Email)
 	if err != nil {
-		if err == database.ErrUserNotFound {
+		if err == user.ErrUserNotFound {
 			log.Debugf("Login failure for %v: user not found in database",
 				l.Email)
 			return loginReplyWithError{
@@ -302,12 +302,12 @@ func (p *politeiawww) login(l *www.Login) loginReplyWithError {
 	}
 
 	// Check the user's password.
-	err = bcrypt.CompareHashAndPassword(user.HashedPassword,
+	err = bcrypt.CompareHashAndPassword(u.HashedPassword,
 		[]byte(l.Password))
 	if err != nil {
-		if !checkUserIsLocked(user.FailedLoginAttempts) {
-			user.FailedLoginAttempts++
-			err := p.db.UserUpdate(*user)
+		if !checkUserIsLocked(u.FailedLoginAttempts) {
+			u.FailedLoginAttempts++
+			err := p.db.UserUpdate(*u)
 			if err != nil {
 				return loginReplyWithError{
 					reply: nil,
@@ -317,10 +317,10 @@ func (p *politeiawww) login(l *www.Login) loginReplyWithError {
 
 			// Check if the user is locked again so we can send an
 			// email.
-			if checkUserIsLocked(user.FailedLoginAttempts) && !p.test {
+			if checkUserIsLocked(u.FailedLoginAttempts) && !p.test {
 				// This is conditional on the email server
 				// being setup.
-				err := p.emailUserLocked(user.Email)
+				err := p.emailUserLocked(u.Email)
 				if err != nil {
 					return loginReplyWithError{
 						reply: nil,
@@ -341,7 +341,7 @@ func (p *politeiawww) login(l *www.Login) loginReplyWithError {
 	}
 
 	// Check that the user is verified.
-	if user.NewUserVerificationToken != nil {
+	if u.NewUserVerificationToken != nil {
 		log.Debugf("Login failure for %v: user not yet verified",
 			l.Email)
 		return loginReplyWithError{
@@ -353,7 +353,7 @@ func (p *politeiawww) login(l *www.Login) loginReplyWithError {
 	}
 
 	// Check if the user account is deactivated.
-	if user.Deactivated {
+	if u.Deactivated {
 		log.Debugf("Login failure for %v: user deactivated", l.Email)
 		return loginReplyWithError{
 			reply: nil,
@@ -364,7 +364,7 @@ func (p *politeiawww) login(l *www.Login) loginReplyWithError {
 	}
 
 	// Check if user is locked due to too many login attempts
-	if checkUserIsLocked(user.FailedLoginAttempts) {
+	if checkUserIsLocked(u.FailedLoginAttempts) {
 		log.Debugf("Login failure for %v: user locked",
 			l.Email)
 		return loginReplyWithError{
@@ -375,17 +375,17 @@ func (p *politeiawww) login(l *www.Login) loginReplyWithError {
 		}
 	}
 
-	lastLoginTime := user.LastLoginTime
-	user.FailedLoginAttempts = 0
-	user.LastLoginTime = time.Now().Unix()
-	err = p.db.UserUpdate(*user)
+	lastLoginTime := u.LastLoginTime
+	u.FailedLoginAttempts = 0
+	u.LastLoginTime = time.Now().Unix()
+	err = p.db.UserUpdate(*u)
 	if err != nil {
 		return loginReplyWithError{
 			reply: nil,
 			err:   err,
 		}
 	}
-	reply, err := p.CreateLoginReply(user, lastLoginTime)
+	reply, err := p.CreateLoginReply(u, lastLoginTime)
 	return loginReplyWithError{
 		reply: reply,
 		err:   err,
@@ -400,7 +400,7 @@ func (p *politeiawww) initUserPubkeys() error {
 	p.Lock()
 	defer p.Unlock()
 
-	return p.db.AllUsers(func(u *database.User) {
+	return p.db.AllUsers(func(u *user.User) {
 		userId := u.ID.String()
 		for _, v := range u.Identities {
 			key := hex.EncodeToString(v.Key[:])
@@ -413,11 +413,11 @@ func (p *politeiawww) initUserPubkeys() error {
 // the userPubkeys cache.
 //
 // This function must be called WITHOUT the lock held.
-func (p *politeiawww) setUserPubkeyAssociaton(user *database.User, publicKey string) {
+func (p *politeiawww) setUserPubkeyAssociaton(u *user.User, publicKey string) {
 	p.Lock()
 	defer p.Unlock()
 
-	userID := user.ID.String()
+	userID := u.ID.String()
 	p.userPubkeys[publicKey] = userID
 }
 
@@ -425,7 +425,7 @@ func (p *politeiawww) setUserPubkeyAssociaton(user *database.User, publicKey str
 // userPubkeys cache.
 //
 // This function must be called WITHOUT the lock held.
-func (p *politeiawww) removeUserPubkeyAssociaton(user *database.User, publicKey string) {
+func (p *politeiawww) removeUserPubkeyAssociaton(u *user.User, publicKey string) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -456,7 +456,7 @@ func (p *politeiawww) initCommentScores() error {
 	return nil
 }
 
-func (p *politeiawww) validateUsername(username string, userToMatch *database.User) error {
+func (p *politeiawww) validateUsername(username string, userToMatch *user.User) error {
 	if len(username) < www.PolicyMinUsernameLength ||
 		len(username) > www.PolicyMaxUsernameLength {
 		log.Tracef("Username not within bounds: %s", username)
@@ -472,12 +472,12 @@ func (p *politeiawww) validateUsername(username string, userToMatch *database.Us
 		}
 	}
 
-	user, err := p.db.UserGetByUsername(username)
+	u, err := p.db.UserGetByUsername(username)
 	if err != nil {
 		return err
 	}
-	if user != nil {
-		if userToMatch == nil || user.ID != userToMatch.ID {
+	if u != nil {
+		if userToMatch == nil || u.ID != userToMatch.ID {
 			return www.UserError{
 				ErrorCode: www.ErrorStatusDuplicateUsername,
 			}
@@ -516,7 +516,7 @@ func validatePubkey(publicKey string) ([]byte, error) {
 	return pk, nil
 }
 
-func (p *politeiawww) validatePubkeyIsUnique(publicKey string, user *database.User) error {
+func (p *politeiawww) validatePubkeyIsUnique(publicKey string, u *user.User) error {
 	p.RLock()
 	userIDStr, ok := p.userPubkeys[publicKey]
 	p.RUnlock()
@@ -529,7 +529,7 @@ func (p *politeiawww) validatePubkeyIsUnique(publicKey string, user *database.Us
 		return err
 	}
 
-	if user != nil && user.ID == userID {
+	if u != nil && u.ID == userID {
 		return nil
 	}
 
@@ -538,7 +538,7 @@ func (p *politeiawww) validatePubkeyIsUnique(publicKey string, user *database.Us
 	}
 }
 
-func validateProposal(np www.NewProposal, user *database.User) error {
+func validateProposal(np www.NewProposal, u *user.User) error {
 	log.Tracef("validateProposal")
 
 	// Obtain signature
@@ -550,7 +550,7 @@ func validateProposal(np www.NewProposal, user *database.User) error {
 	}
 
 	// Verify public key
-	id, err := checkPublicKey(user, np.PublicKey)
+	id, err := checkPublicKey(u, np.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -684,24 +684,24 @@ func validateProposal(np www.NewProposal, user *database.User) error {
 	return nil
 }
 
-func setNewUserVerificationAndIdentity(user *database.User, token []byte, expiry int64, includeResend bool, pk []byte) {
-	user.NewUserVerificationToken = token
-	user.NewUserVerificationExpiry = expiry
+func setNewUserVerificationAndIdentity(u *user.User, token []byte, expiry int64, includeResend bool, pk []byte) {
+	u.NewUserVerificationToken = token
+	u.NewUserVerificationExpiry = expiry
 	if includeResend {
 		// This field is used to support requesting another registration email
 		// quickly, without having to wait the full email-spam-prevention
 		// period.
-		user.ResendNewUserVerificationExpiry = expiry
+		u.ResendNewUserVerificationExpiry = expiry
 	}
-	user.Identities = []database.Identity{{
+	u.Identities = []user.Identity{{
 		Activated: time.Now().Unix(),
 	}}
-	copy(user.Identities[0].Key[:], pk)
+	copy(u.Identities[0].Key[:], pk)
 }
 
-func (p *politeiawww) emailResetPassword(user *database.User, rp www.ResetPassword, rpr *www.ResetPasswordReply) error {
-	if user.ResetPasswordVerificationToken != nil {
-		if user.ResetPasswordVerificationExpiry > time.Now().Unix() {
+func (p *politeiawww) emailResetPassword(u *user.User, rp www.ResetPassword, rpr *www.ResetPasswordReply) error {
+	if u.ResetPasswordVerificationToken != nil {
+		if u.ResetPasswordVerificationExpiry > time.Now().Unix() {
 			// The verification token is present and hasn't expired, so do nothing.
 			return nil
 		}
@@ -716,9 +716,9 @@ func (p *politeiawww) emailResetPassword(user *database.User, rp www.ResetPasswo
 	}
 
 	// Add the updated user information to the db.
-	user.ResetPasswordVerificationToken = token
-	user.ResetPasswordVerificationExpiry = expiry
-	err = p.db.UserUpdate(*user)
+	u.ResetPasswordVerificationToken = token
+	u.ResetPasswordVerificationExpiry = expiry
+	err = p.db.UserUpdate(*u)
 	if err != nil {
 		return err
 	}
@@ -739,7 +739,7 @@ func (p *politeiawww) emailResetPassword(user *database.User, rp www.ResetPasswo
 	return nil
 }
 
-func (p *politeiawww) verifyResetPassword(user *database.User, rp www.ResetPassword, rpr *www.ResetPasswordReply) error {
+func (p *politeiawww) verifyResetPassword(u *user.User, rp www.ResetPassword, rpr *www.ResetPasswordReply) error {
 	// Decode the verification token.
 	token, err := hex.DecodeString(rp.VerificationToken)
 	if err != nil {
@@ -751,17 +751,17 @@ func (p *politeiawww) verifyResetPassword(user *database.User, rp www.ResetPassw
 	}
 
 	// Check that the verification token matches.
-	if !bytes.Equal(token, user.ResetPasswordVerificationToken) {
+	if !bytes.Equal(token, u.ResetPasswordVerificationToken) {
 		log.Debugf("VerifyResetPassword failure for %v: verification token doesn't "+
 			"match, expected %v", rp.Email,
-			user.ResetPasswordVerificationToken)
+			u.ResetPasswordVerificationToken)
 		return www.UserError{
 			ErrorCode: www.ErrorStatusVerificationTokenInvalid,
 		}
 	}
 
 	// Check that the token hasn't expired.
-	if user.ResetPasswordVerificationExpiry < time.Now().Unix() {
+	if u.ResetPasswordVerificationExpiry < time.Now().Unix() {
 		log.Debugf("VerifyResetPassword failure for %v: verification token "+
 			"not expired yet", rp.Email)
 		return www.UserError{
@@ -783,40 +783,40 @@ func (p *politeiawww) verifyResetPassword(user *database.User, rp www.ResetPassw
 
 	// Clear out the verification token fields, set the new password in the db,
 	// and unlock account
-	user.ResetPasswordVerificationToken = nil
-	user.ResetPasswordVerificationExpiry = 0
-	user.HashedPassword = hashedPassword
-	user.FailedLoginAttempts = 0
+	u.ResetPasswordVerificationToken = nil
+	u.ResetPasswordVerificationExpiry = 0
+	u.HashedPassword = hashedPassword
+	u.FailedLoginAttempts = 0
 
-	return p.db.UserUpdate(*user)
+	return p.db.UserUpdate(*u)
 }
 
-func (p *politeiawww) CreateLoginReply(user *database.User, lastLoginTime int64) (*www.LoginReply, error) {
-	activeIdentity, ok := database.ActiveIdentityString(user.Identities)
+func (p *politeiawww) CreateLoginReply(u *user.User, lastLoginTime int64) (*www.LoginReply, error) {
+	activeIdentity, ok := user.ActiveIdentityString(u.Identities)
 	if !ok {
 		activeIdentity = ""
 	}
 
 	reply := www.LoginReply{
-		IsAdmin:         user.Admin,
-		UserID:          user.ID.String(),
-		Email:           user.Email,
-		Username:        user.Username,
+		IsAdmin:         u.Admin,
+		UserID:          u.ID.String(),
+		Email:           u.Email,
+		Username:        u.Username,
 		PublicKey:       activeIdentity,
-		PaywallTxID:     user.NewUserPaywallTx,
-		ProposalCredits: ProposalCreditBalance(user),
+		PaywallTxID:     u.NewUserPaywallTx,
+		ProposalCredits: ProposalCreditBalance(u),
 		LastLoginTime:   lastLoginTime,
 	}
 
-	if !p.HasUserPaid(user) {
-		err := p.GenerateNewUserPaywall(user)
+	if !p.HasUserPaid(u) {
+		err := p.GenerateNewUserPaywall(u)
 		if err != nil {
 			return nil, err
 		}
 
-		reply.PaywallAddress = user.NewUserPaywallAddress
-		reply.PaywallAmount = user.NewUserPaywallAmount
-		reply.PaywallTxNotBefore = user.NewUserPaywallTxNotBefore
+		reply.PaywallAddress = u.NewUserPaywallAddress
+		reply.PaywallAmount = u.NewUserPaywallAmount
+		reply.PaywallTxNotBefore = u.NewUserPaywallTxNotBefore
 	}
 
 	return &reply, nil
@@ -887,7 +887,7 @@ func (p *politeiawww) ProcessNewUser(u www.NewUser) (*www.NewUserReply, error) {
 	}
 
 	// Create a new database user with the provided information.
-	newUser := database.User{
+	newUser := user.User{
 		Email:          strings.ToLower(u.Email),
 		Username:       username,
 		HashedPassword: hashedPassword,
@@ -922,7 +922,7 @@ func (p *politeiawww) ProcessNewUser(u www.NewUser) (*www.NewUserReply, error) {
 
 	// Error handling for the db write.
 	if err != nil {
-		if err == database.ErrInvalidEmail {
+		if err == user.ErrInvalidEmail {
 			return nil, www.UserError{
 				ErrorCode: www.ErrorStatusMalformedEmail,
 			}
@@ -962,11 +962,11 @@ func (p *politeiawww) ProcessNewUser(u www.NewUser) (*www.NewUserReply, error) {
 // ProcessVerifyNewUser verifies the token generated for a recently created
 // user.  It ensures that the token matches with the input and that the token
 // hasn't expired.  On success it returns database user record.
-func (p *politeiawww) ProcessVerifyNewUser(u www.VerifyNewUser) (*database.User, error) {
+func (p *politeiawww) ProcessVerifyNewUser(usr www.VerifyNewUser) (*user.User, error) {
 	// Check that the user already exists.
-	user, err := p.db.UserGet(u.Email)
+	u, err := p.db.UserGet(usr.Email)
 	if err != nil {
-		if err == database.ErrUserNotFound {
+		if err == user.ErrUserNotFound {
 			log.Debugf("VerifyNewUser failure for %v: user not found",
 				u.Email)
 			return nil, www.UserError{
@@ -977,7 +977,7 @@ func (p *politeiawww) ProcessVerifyNewUser(u www.VerifyNewUser) (*database.User,
 	}
 
 	// Decode the verification token.
-	token, err := hex.DecodeString(u.VerificationToken)
+	token, err := hex.DecodeString(usr.VerificationToken)
 	if err != nil {
 		log.Debugf("VerifyNewUser failure for %v: verification token could "+
 			"not be decoded: %v", u.Email, err)
@@ -987,16 +987,16 @@ func (p *politeiawww) ProcessVerifyNewUser(u www.VerifyNewUser) (*database.User,
 	}
 
 	// Check that the verification token matches.
-	if !bytes.Equal(token, user.NewUserVerificationToken) {
+	if !bytes.Equal(token, u.NewUserVerificationToken) {
 		log.Debugf("VerifyNewUser failure for %v: verification token doesn't "+
-			"match, expected %v", u.Email, user.NewUserVerificationToken)
+			"match, expected %v", u.Email, u.NewUserVerificationToken)
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusVerificationTokenInvalid,
 		}
 	}
 
 	// Check that the token hasn't expired.
-	if time.Now().Unix() > user.NewUserVerificationExpiry {
+	if time.Now().Unix() > u.NewUserVerificationExpiry {
 		log.Debugf("VerifyNewUser failure for %v: verification token expired",
 			u.Email)
 		return nil, www.UserError{
@@ -1005,7 +1005,7 @@ func (p *politeiawww) ProcessVerifyNewUser(u www.VerifyNewUser) (*database.User,
 	}
 
 	// Check signature
-	sig, err := util.ConvertSignature(u.Signature)
+	sig, err := util.ConvertSignature(usr.Signature)
 	if err != nil {
 		log.Debugf("VerifyNewUser failure for %v: signature could not be "+
 			"decoded: %v", u.Email, err)
@@ -1014,7 +1014,7 @@ func (p *politeiawww) ProcessVerifyNewUser(u www.VerifyNewUser) (*database.User,
 		}
 	}
 	var pi *identity.PublicIdentity
-	for _, v := range user.Identities {
+	for _, v := range u.Identities {
 		if v.Deactivated != 0 {
 			continue
 		}
@@ -1030,7 +1030,7 @@ func (p *politeiawww) ProcessVerifyNewUser(u www.VerifyNewUser) (*database.User,
 			ErrorCode: www.ErrorStatusNoPublicKey,
 		}
 	}
-	if !pi.VerifyMessage([]byte(u.VerificationToken), sig) {
+	if !pi.VerifyMessage([]byte(usr.VerificationToken), sig) {
 		log.Debugf("VerifyNewUser failure for %v: signature doesn't match "+
 			"(pubkey: %v)", u.Email, pi.String())
 		return nil, www.UserError{
@@ -1039,17 +1039,17 @@ func (p *politeiawww) ProcessVerifyNewUser(u www.VerifyNewUser) (*database.User,
 	}
 
 	// Clear out the verification token fields in the db.
-	user.NewUserVerificationToken = nil
-	user.NewUserVerificationExpiry = 0
-	user.ResendNewUserVerificationExpiry = 0
-	err = p.db.UserUpdate(*user)
+	u.NewUserVerificationToken = nil
+	u.NewUserVerificationExpiry = 0
+	u.ResendNewUserVerificationExpiry = 0
+	err = p.db.UserUpdate(*u)
 	if err != nil {
 		return nil, err
 	}
 
-	p.addUserToPaywallPoolLock(user, paywallTypeUser)
+	p.addUserToPaywallPoolLock(u, paywallTypeUser)
 
-	return user, nil
+	return u, nil
 }
 
 // ProcessResendVerification resends a new user verification email if the
@@ -1058,9 +1058,9 @@ func (p *politeiawww) ProcessResendVerification(rv *www.ResendVerification) (*ww
 	rvr := www.ResendVerificationReply{}
 
 	// Get user from db.
-	user, err := p.db.UserGet(rv.Email)
+	u, err := p.db.UserGet(rv.Email)
 	if err != nil {
-		if err == database.ErrUserNotFound {
+		if err == user.ErrUserNotFound {
 			log.Debugf("ResendVerification failure for %v: user not found",
 				rv.Email)
 			return &rvr, nil
@@ -1070,13 +1070,13 @@ func (p *politeiawww) ProcessResendVerification(rv *www.ResendVerification) (*ww
 
 	// Don't do anything if the user is already verified or the token hasn't
 	// expired yet.
-	if user.NewUserVerificationToken == nil {
+	if u.NewUserVerificationToken == nil {
 		log.Debugf("ResendVerification failure for %v: user already verified",
 			rv.Email)
 		return &rvr, nil
 	}
 
-	if user.ResendNewUserVerificationExpiry > time.Now().Unix() {
+	if u.ResendNewUserVerificationExpiry > time.Now().Unix() {
 		log.Debugf("ResendVerification failure for %v: verification token "+
 			"not expired yet", rv.Email)
 		return &rvr, nil
@@ -1089,7 +1089,7 @@ func (p *politeiawww) ProcessResendVerification(rv *www.ResendVerification) (*ww
 	}
 
 	// Validate that the pubkey isn't already taken.
-	err = p.validatePubkeyIsUnique(rv.PublicKey, user)
+	err = p.validatePubkeyIsUnique(rv.PublicKey, u)
 	if err != nil {
 		return nil, err
 	}
@@ -1101,24 +1101,25 @@ func (p *politeiawww) ProcessResendVerification(rv *www.ResendVerification) (*ww
 	}
 
 	// Remove the original pubkey from the cache.
-	existingPublicKey := hex.EncodeToString(user.Identities[0].Key[:])
-	p.removeUserPubkeyAssociaton(user, existingPublicKey)
+	existingPublicKey := hex.EncodeToString(u.Identities[0].Key[:])
+	p.removeUserPubkeyAssociaton(u, existingPublicKey)
 
 	// Set a new verificaton token and identity.
-	setNewUserVerificationAndIdentity(user, token, expiry, true, pk)
+	setNewUserVerificationAndIdentity(u, token, expiry, true, pk)
 
 	// Associate the user id with the new identity.
-	p.setUserPubkeyAssociaton(user, rv.PublicKey)
+	p.setUserPubkeyAssociaton(u, rv.PublicKey)
 
 	// Update the user in the db.
-	err = p.db.UserUpdate(*user)
+	err = p.db.UserUpdate(*u)
 	if err != nil {
 		return nil, err
 	}
 
 	if !p.test {
 		// This is conditional on the email server being setup.
-		err := p.emailNewUserVerificationLink(user.Email, hex.EncodeToString(token), user.Username)
+		err := p.emailNewUserVerificationLink(u.Email,
+			hex.EncodeToString(token), u.Username)
 		if err != nil {
 			return nil, err
 		}
@@ -1134,7 +1135,7 @@ func (p *politeiawww) ProcessResendVerification(rv *www.ResendVerification) (*ww
 // ProcessUpdateUserKey sets a verification token and expiry to allow the user to
 // update his key pair; the token must be verified before it expires. If the
 // token is already set and is expired, it generates a new one.
-func (p *politeiawww) ProcessUpdateUserKey(user *database.User, u www.UpdateUserKey) (*www.UpdateUserKeyReply, error) {
+func (p *politeiawww) ProcessUpdateUserKey(usr *user.User, u www.UpdateUserKey) (*www.UpdateUserKeyReply, error) {
 	var reply www.UpdateUserKeyReply
 	var token []byte
 	var expiry int64
@@ -1152,12 +1153,12 @@ func (p *politeiawww) ProcessUpdateUserKey(user *database.User, u www.UpdateUser
 	}
 
 	// Check if the verification token hasn't expired yet.
-	if user.UpdateKeyVerificationToken != nil {
-		if user.UpdateKeyVerificationExpiry > time.Now().Unix() {
+	if usr.UpdateKeyVerificationToken != nil {
+		if usr.UpdateKeyVerificationExpiry > time.Now().Unix() {
 			return nil, www.UserError{
 				ErrorCode: www.ErrorStatusVerificationTokenUnexpired,
 				ErrorContext: []string{
-					strconv.FormatInt(user.UpdateKeyVerificationExpiry, 10),
+					strconv.FormatInt(usr.UpdateKeyVerificationExpiry, 10),
 				},
 			}
 		}
@@ -1170,21 +1171,21 @@ func (p *politeiawww) ProcessUpdateUserKey(user *database.User, u www.UpdateUser
 	}
 
 	// Add the updated user information to the db.
-	user.UpdateKeyVerificationToken = token
-	user.UpdateKeyVerificationExpiry = expiry
+	usr.UpdateKeyVerificationToken = token
+	usr.UpdateKeyVerificationExpiry = expiry
 
-	identity := database.Identity{}
+	identity := user.Identity{}
 	copy(identity.Key[:], pk)
-	user.Identities = append(user.Identities, identity)
+	usr.Identities = append(usr.Identities, identity)
 
-	err = p.db.UserUpdate(*user)
+	err = p.db.UserUpdate(*usr)
 	if err != nil {
 		return nil, err
 	}
 
 	if !p.test {
 		// This is conditional on the email server being setup.
-		err := p.emailUpdateUserKeyVerificationLink(user.Email, u.PublicKey,
+		err := p.emailUpdateUserKeyVerificationLink(usr.Email, u.PublicKey,
 			hex.EncodeToString(token))
 		if err != nil {
 			return nil, err
@@ -1201,31 +1202,31 @@ func (p *politeiawww) ProcessUpdateUserKey(user *database.User, u www.UpdateUser
 // ProcessVerifyUpdateUserKey verifies the token generated for the recently
 // generated key pair. It ensures that the token matches with the input and
 // that the token hasn't expired.
-func (p *politeiawww) ProcessVerifyUpdateUserKey(user *database.User, vu www.VerifyUpdateUserKey) (*database.User, error) {
+func (p *politeiawww) ProcessVerifyUpdateUserKey(u *user.User, vu www.VerifyUpdateUserKey) (*user.User, error) {
 	// Decode the verification token.
 	token, err := hex.DecodeString(vu.VerificationToken)
 	if err != nil {
 		log.Debugf("VerifyUpdateUserKey failure for %v: verification token "+
-			"could not be decoded: %v", user.Email, err)
+			"could not be decoded: %v", u.Email, err)
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusVerificationTokenInvalid,
 		}
 	}
 
 	// Check that the verification token matches.
-	if !bytes.Equal(token, user.UpdateKeyVerificationToken) {
+	if !bytes.Equal(token, u.UpdateKeyVerificationToken) {
 		log.Debugf("VerifyUpdateUserKey failure for %v: verification token "+
-			"doesn't match, expected %v", user.Email,
-			user.UpdateKeyVerificationToken, token)
+			"doesn't match, expected %v", u.Email,
+			u.UpdateKeyVerificationToken, token)
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusVerificationTokenInvalid,
 		}
 	}
 
 	// Check that the token hasn't expired.
-	if user.UpdateKeyVerificationExpiry < time.Now().Unix() {
+	if u.UpdateKeyVerificationExpiry < time.Now().Unix() {
 		log.Debugf("VerifyUpdateUserKey failure for %v: verification token "+
-			"not expired yet", user.Email)
+			"not expired yet", u.Email)
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusVerificationTokenExpired,
 		}
@@ -1235,13 +1236,13 @@ func (p *politeiawww) ProcessVerifyUpdateUserKey(user *database.User, vu www.Ver
 	sig, err := util.ConvertSignature(vu.Signature)
 	if err != nil {
 		log.Debugf("VerifyUpdateUserKey failure for %v: signature could not "+
-			"be decoded: %v", user.Email, err)
+			"be decoded: %v", u.Email, err)
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusInvalidSignature,
 		}
 	}
 
-	id := user.Identities[len(user.Identities)-1]
+	id := u.Identities[len(u.Identities)-1]
 	pi, err := identity.PublicIdentityFromBytes(id.Key[:])
 	if err != nil {
 		return nil, err
@@ -1249,31 +1250,31 @@ func (p *politeiawww) ProcessVerifyUpdateUserKey(user *database.User, vu www.Ver
 
 	if !pi.VerifyMessage([]byte(vu.VerificationToken), sig) {
 		log.Debugf("VerifyUpdateUserKey failure for %v: signature did not "+
-			"match (pubkey: %v)", user.Email, pi.String())
+			"match (pubkey: %v)", u.Email, pi.String())
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusInvalidSignature,
 		}
 	}
 
 	// Associate the user id with the new public key.
-	p.setUserPubkeyAssociaton(user, pi.String())
+	p.setUserPubkeyAssociaton(u, pi.String())
 
 	// Clear out the verification token fields in the db and activate
 	// the key and deactivate the one it's replacing.
-	user.UpdateKeyVerificationToken = nil
-	user.UpdateKeyVerificationExpiry = 0
+	u.UpdateKeyVerificationToken = nil
+	u.UpdateKeyVerificationExpiry = 0
 
 	t := time.Now().Unix()
-	for k, v := range user.Identities {
+	for k, v := range u.Identities {
 		if v.Deactivated == 0 {
-			user.Identities[k].Deactivated = t
+			u.Identities[k].Deactivated = t
 			break
 		}
 	}
-	user.Identities[len(user.Identities)-1].Activated = t
-	user.Identities[len(user.Identities)-1].Deactivated = 0
+	u.Identities[len(u.Identities)-1].Activated = t
+	u.Identities[len(u.Identities)-1].Deactivated = 0
 
-	return user, p.db.UserUpdate(*user)
+	return u, p.db.UserUpdate(*u)
 }
 
 // ProcessLogin checks that a user exists, is verified, and has
@@ -1316,13 +1317,13 @@ func (p *politeiawww) ProcessChangeUsername(email string, cu www.ChangeUsername)
 	var reply www.ChangeUsernameReply
 
 	// Get user from db.
-	user, err := p.db.UserGet(email)
+	u, err := p.db.UserGet(email)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check the user's password.
-	err = bcrypt.CompareHashAndPassword(user.HashedPassword,
+	err = bcrypt.CompareHashAndPassword(u.HashedPassword,
 		[]byte(cu.Password))
 	if err != nil {
 		return nil, www.UserError{
@@ -1338,8 +1339,8 @@ func (p *politeiawww) ProcessChangeUsername(email string, cu www.ChangeUsername)
 	}
 
 	// Add the updated user information to the db.
-	user.Username = newUsername
-	err = p.db.UserUpdate(*user)
+	u.Username = newUsername
+	err = p.db.UserUpdate(*u)
 	if err != nil {
 		return nil, err
 	}
@@ -1353,13 +1354,13 @@ func (p *politeiawww) ProcessChangePassword(email string, cp www.ChangePassword)
 	var reply www.ChangePasswordReply
 
 	// Get user from db.
-	user, err := p.db.UserGet(email)
+	u, err := p.db.UserGet(email)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check the user's password.
-	err = bcrypt.CompareHashAndPassword(user.HashedPassword,
+	err = bcrypt.CompareHashAndPassword(u.HashedPassword,
 		[]byte(cp.CurrentPassword))
 	if err != nil {
 		return nil, www.UserError{
@@ -1380,8 +1381,8 @@ func (p *politeiawww) ProcessChangePassword(email string, cp www.ChangePassword)
 	}
 
 	// Add the updated user information to the db.
-	user.HashedPassword = hashedPassword
-	err = p.db.UserUpdate(*user)
+	u.HashedPassword = hashedPassword
+	err = p.db.UserUpdate(*u)
 	if err != nil {
 		return nil, err
 	}
@@ -1403,13 +1404,13 @@ func (p *politeiawww) ProcessResetPassword(rp www.ResetPassword) (*www.ResetPass
 	var reply www.ResetPasswordReply
 
 	// Get user from db.
-	user, err := p.db.UserGet(rp.Email)
+	u, err := p.db.UserGet(rp.Email)
 	if err != nil {
-		if err == database.ErrInvalidEmail {
+		if err == user.ErrInvalidEmail {
 			return nil, www.UserError{
 				ErrorCode: www.ErrorStatusMalformedEmail,
 			}
-		} else if err == database.ErrUserNotFound {
+		} else if err == user.ErrUserNotFound {
 			log.Debugf("ResetPassword failure for %v: user not found", rp.Email)
 			return &reply, nil
 		}
@@ -1418,9 +1419,9 @@ func (p *politeiawww) ProcessResetPassword(rp www.ResetPassword) (*www.ResetPass
 	}
 
 	if rp.VerificationToken == "" {
-		err = p.emailResetPassword(user, rp, &reply)
+		err = p.emailResetPassword(u, rp, &reply)
 	} else {
-		err = p.verifyResetPassword(user, rp, &reply)
+		err = p.verifyResetPassword(u, rp, &reply)
 	}
 
 	if err != nil {
@@ -1432,14 +1433,14 @@ func (p *politeiawww) ProcessResetPassword(rp www.ResetPassword) (*www.ResetPass
 
 // ProcessUserProposalCredits returns a list of the user's unspent proposal
 // credits and a list of the user's spent proposal credits.
-func ProcessUserProposalCredits(user *database.User) (*www.UserProposalCreditsReply, error) {
+func ProcessUserProposalCredits(u *user.User) (*www.UserProposalCreditsReply, error) {
 	// Convert from database proposal credits to www proposal credits.
-	upc := make([]www.ProposalCredit, len(user.UnspentProposalCredits))
-	for i, credit := range user.UnspentProposalCredits {
+	upc := make([]www.ProposalCredit, len(u.UnspentProposalCredits))
+	for i, credit := range u.UnspentProposalCredits {
 		upc[i] = convertWWWPropCreditFromDatabasePropCredit(credit)
 	}
-	spc := make([]www.ProposalCredit, len(user.SpentProposalCredits))
-	for i, credit := range user.SpentProposalCredits {
+	spc := make([]www.ProposalCredit, len(u.SpentProposalCredits))
+	for i, credit := range u.SpentProposalCredits {
 		spc[i] = convertWWWPropCreditFromDatabasePropCredit(credit)
 	}
 
@@ -1536,7 +1537,7 @@ func (p *politeiawww) ProcessCastVotes(ballot *www.Ballot) (*www.BallotReply, er
 
 // ProcessAuthorizeVote sends the authorizevote command to decred plugin to
 // indicate that a proposal has been finalized and is ready to be voted on.
-func (p *politeiawww) ProcessAuthorizeVote(av www.AuthorizeVote, user *database.User) (*www.AuthorizeVoteReply, error) {
+func (p *politeiawww) ProcessAuthorizeVote(av www.AuthorizeVote, u *user.User) (*www.AuthorizeVoteReply, error) {
 	log.Tracef("ProcessAuthorizeVote %v", av.Token)
 
 	// Get proposal from the cache
@@ -1551,7 +1552,7 @@ func (p *politeiawww) ProcessAuthorizeVote(av www.AuthorizeVote, user *database.
 	}
 
 	// Verify signature authenticity
-	err = checkPublicKeyAndSignature(user, av.PublicKey, av.Signature,
+	err = checkPublicKeyAndSignature(u, av.PublicKey, av.Signature,
 		av.Token, pr.Version, av.Action)
 	if err != nil {
 		return nil, err
@@ -1605,7 +1606,7 @@ func (p *politeiawww) ProcessAuthorizeVote(av www.AuthorizeVote, user *database.
 		userID, ok := p.userPubkeys[pr.PublicKey]
 		p.RUnlock()
 		if ok {
-			if user.ID.String() != userID {
+			if u.ID.String() != userID {
 				return nil, www.UserError{
 					ErrorCode: www.ErrorStatusUserNotAuthor,
 				}
@@ -1665,7 +1666,7 @@ func (p *politeiawww) ProcessAuthorizeVote(av www.AuthorizeVote, user *database.
 		p.fireEvent(EventTypeProposalVoteAuthorized,
 			EventDataProposalVoteAuthorized{
 				AuthorizeVote: &av,
-				User:          user,
+				User:          u,
 			},
 		)
 	}
@@ -1697,11 +1698,11 @@ func validateVoteBit(vote www.Vote, bit uint64) error {
 	return fmt.Errorf("bit not found 0x%x", bit)
 }
 
-func (p *politeiawww) ProcessStartVote(sv www.StartVote, user *database.User) (*www.StartVoteReply, error) {
+func (p *politeiawww) ProcessStartVote(sv www.StartVote, u *user.User) (*www.StartVoteReply, error) {
 	log.Tracef("ProcessStartVote %v", sv.Vote.Token)
 
 	// Verify user
-	err := checkPublicKeyAndSignature(user, sv.PublicKey, sv.Signature,
+	err := checkPublicKeyAndSignature(u, sv.PublicKey, sv.Signature,
 		sv.Vote.Token)
 	if err != nil {
 		return nil, err
@@ -1810,7 +1811,7 @@ func (p *politeiawww) ProcessStartVote(sv www.StartVote, user *database.User) (*
 	if !p.test {
 		p.eventManager._fireEvent(EventTypeProposalVoteStarted,
 			EventDataProposalVoteStarted{
-				AdminUser: user,
+				AdminUser: u,
 				StartVote: &sv,
 			},
 		)
@@ -1973,7 +1974,7 @@ func getProposalName(files []www.File) (string, error) {
 
 // convertWWWPropCreditFromDatabasePropCredit coverts a database proposal
 // credit to a v1 proposal credit.
-func convertWWWPropCreditFromDatabasePropCredit(credit database.ProposalCredit) www.ProposalCredit {
+func convertWWWPropCreditFromDatabasePropCredit(credit user.ProposalCredit) www.ProposalCredit {
 	return www.ProposalCredit{
 		PaywallID:     credit.PaywallID,
 		Price:         credit.Price,

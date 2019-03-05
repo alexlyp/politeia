@@ -14,12 +14,12 @@ import (
 
 	v1 "github.com/decred/politeia/politeiawww/api/v1"
 	www "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
+	"github.com/decred/politeia/politeiawww/user"
 	"github.com/decred/politeia/util"
 	"github.com/google/uuid"
 )
 
-func convertWWWUserFromDatabaseUser(user *database.User) www.User {
+func convertWWWUserFromDatabaseUser(user *user.User) www.User {
 	return www.User{
 		ID:                              user.ID.String(),
 		Admin:                           user.Admin,
@@ -46,7 +46,7 @@ func convertWWWUserFromDatabaseUser(user *database.User) www.User {
 	}
 }
 
-func convertWWWIdentitiesFromDatabaseIdentities(identities []database.Identity) []www.UserIdentity {
+func convertWWWIdentitiesFromDatabaseIdentities(identities []user.Identity) []www.UserIdentity {
 	userIdentities := make([]www.UserIdentity, 0, len(identities))
 	for _, v := range identities {
 		userIdentities = append(userIdentities, convertWWWIdentityFromDatabaseIdentity(v))
@@ -54,14 +54,14 @@ func convertWWWIdentitiesFromDatabaseIdentities(identities []database.Identity) 
 	return userIdentities
 }
 
-func convertWWWIdentityFromDatabaseIdentity(identity database.Identity) www.UserIdentity {
+func convertWWWIdentityFromDatabaseIdentity(identity user.Identity) www.UserIdentity {
 	return www.UserIdentity{
 		Pubkey: hex.EncodeToString(identity.Key[:]),
-		Active: database.IsIdentityActive(identity),
+		Active: user.IsIdentityActive(identity),
 	}
 }
 
-func (p *politeiawww) getUserByIDStr(userIDStr string) (*database.User, error) {
+func (p *politeiawww) getUserByIDStr(userIDStr string) (*user.User, error) {
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return nil, www.UserError{
@@ -115,7 +115,7 @@ func (p *politeiawww) ProcessUserDetails(ud *www.UserDetails, isCurrentUser bool
 }
 
 // ProcessEditUser edits a user's preferences.
-func (p *politeiawww) ProcessEditUser(eu *www.EditUser, user *database.User) (*www.EditUserReply, error) {
+func (p *politeiawww) ProcessEditUser(eu *www.EditUser, user *user.User) (*www.EditUserReply, error) {
 	if eu.EmailNotifications != nil {
 		user.EmailNotifications = *eu.EmailNotifications
 	}
@@ -131,7 +131,7 @@ func (p *politeiawww) ProcessEditUser(eu *www.EditUser, user *database.User) (*w
 
 // ProcessUserCommentsLikes returns all of the user's comment likes for the
 // passed in proposal.
-func (p *politeiawww) ProcessUserCommentsLikes(user *database.User, token string) (*www.UserCommentsLikesReply, error) {
+func (p *politeiawww) ProcessUserCommentsLikes(user *user.User, token string) (*www.UserCommentsLikesReply, error) {
 	log.Tracef("ProcessUserCommentsLikes: %v %v", user.ID, token)
 
 	// Fetch all like comments for the proposal
@@ -216,7 +216,7 @@ func (p *politeiawww) ProcessUserCommentsLikes(user *database.User, token string
 // _logAdminAction logs a string to the admin log file.
 //
 // This function must be called WITH the mutex held.
-func (p *politeiawww) _logAdminAction(adminUser *database.User, content string) error {
+func (p *politeiawww) _logAdminAction(adminUser *user.User, content string) error {
 	if p.test {
 		return nil
 	}
@@ -236,7 +236,7 @@ func (p *politeiawww) _logAdminAction(adminUser *database.User, content string) 
 // logAdminAction logs a string to the admin log file.
 //
 // This function must be called WITHOUT the mutex held.
-func (p *politeiawww) logAdminAction(adminUser *database.User, content string) error {
+func (p *politeiawww) logAdminAction(adminUser *user.User, content string) error {
 	p.Lock()
 	defer p.Unlock()
 
@@ -246,7 +246,7 @@ func (p *politeiawww) logAdminAction(adminUser *database.User, content string) e
 // logAdminUserAction logs an admin action on a specific user.
 //
 // This function must be called WITHOUT the mutex held.
-func (p *politeiawww) logAdminUserAction(adminUser, user *database.User, action v1.UserManageActionT, reasonForAction string) error {
+func (p *politeiawww) logAdminUserAction(adminUser, user *user.User, action v1.UserManageActionT, reasonForAction string) error {
 	return p.logAdminAction(adminUser, fmt.Sprintf("%v,%v,%v,%v",
 		v1.UserManageAction[action], user.ID, user.Username, reasonForAction))
 }
@@ -254,11 +254,11 @@ func (p *politeiawww) logAdminUserAction(adminUser, user *database.User, action 
 // logAdminProposalAction logs an admin action on a proposal.
 //
 // This function must be called WITHOUT the mutex held.
-func (p *politeiawww) logAdminProposalAction(adminUser *database.User, token, action, reason string) error {
+func (p *politeiawww) logAdminProposalAction(adminUser *user.User, token, action, reason string) error {
 	return p.logAdminAction(adminUser, fmt.Sprintf("%v,%v,%v", action, token, reason))
 }
 
-func (p *politeiawww) ProcessManageUser(mu *v1.ManageUser, adminUser *database.User) (*v1.ManageUserReply, error) {
+func (p *politeiawww) ProcessManageUser(mu *v1.ManageUser, adminUser *user.User) (*v1.ManageUserReply, error) {
 	// Fetch the database user.
 	user, err := p.getUserByIDStr(mu.UserID)
 	if err != nil {
@@ -333,7 +333,7 @@ func (p *politeiawww) ProcessUsers(users *v1.Users) (*v1.UsersReply, error) {
 	emailQuery := strings.ToLower(users.Email)
 	usernameQuery := formatUsername(users.Username)
 
-	err := p.db.AllUsers(func(user *database.User) {
+	err := p.db.AllUsers(func(user *user.User) {
 		reply.TotalUsers++
 		userMatches := true
 
@@ -383,14 +383,14 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 	}
 
 	// Lookup user
-	user, err := p.getUserByIDStr(upr.UserID)
+	u, err := p.getUserByIDStr(upr.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Fetch user payments
-	payments, err := util.FetchTxsForAddressNotBefore(user.NewUserPaywallAddress,
-		user.NewUserPaywallTxNotBefore)
+	payments, err := util.FetchTxsForAddressNotBefore(u.NewUserPaywallAddress,
+		u.NewUserPaywallTxNotBefore)
 	if err != nil {
 		return nil, fmt.Errorf("FetchTxsForAddressNotBefore: %v", err)
 	}
@@ -403,19 +403,19 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 
 	// Sanity check. Paywalls should already be in chronological
 	// order.
-	paywalls := user.ProposalPaywalls
+	paywalls := u.ProposalPaywalls
 	sort.SliceStable(paywalls, func(i, j int) bool {
 		return paywalls[i].TxNotBefore < paywalls[j].TxNotBefore
 	})
 
 	// Check for payments that were missed by paywall polling
-	newCredits := make([]database.ProposalCredit, 0, len(payments))
+	newCredits := make([]user.ProposalCredit, 0, len(payments))
 	for _, payment := range payments {
 		// Check if the payment transaction corresponds to
 		// a user registration payment. A user registration
 		// payment may not exist if the registration paywall
 		// was cleared by an admin.
-		if payment.TxID == user.NewUserPaywallTx {
+		if payment.TxID == u.NewUserPaywallTx {
 			continue
 		}
 
@@ -424,7 +424,7 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 		// was not missed by paywall polling and we can
 		// continue onto the next payment.
 		var found bool
-		for _, credit := range user.SpentProposalCredits {
+		for _, credit := range u.SpentProposalCredits {
 			if credit.TxID == payment.TxID {
 				found = true
 				break
@@ -434,7 +434,7 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 			continue
 		}
 
-		for _, credit := range user.UnspentProposalCredits {
+		for _, credit := range u.UnspentProposalCredits {
 			if credit.TxID == payment.TxID {
 				found = true
 				break
@@ -449,7 +449,7 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 		// credits using the paywall details that correspond
 		// to the payment timestamp. If a paywall had not yet
 		// been issued, use the current proposal credit price.
-		var pp database.ProposalPaywall
+		var pp user.ProposalPaywall
 		for _, paywall := range paywalls {
 			if payment.Timestamp < paywall.TxNotBefore {
 				continue
@@ -461,7 +461,7 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 			}
 		}
 
-		if pp == (database.ProposalPaywall{}) {
+		if pp == (user.ProposalPaywall{}) {
 			// Paywall not found. This means the tx occurred before
 			// any paywalls were issued. Use current credit price.
 			pp.CreditPrice = p.cfg.PaywallAmount
@@ -479,9 +479,9 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 
 		// Create proposal credits
 		numCredits := payment.Amount / pp.CreditPrice
-		c := make([]database.ProposalCredit, numCredits)
+		c := make([]user.ProposalCredit, numCredits)
 		for i := uint64(0); i < numCredits; i++ {
-			c[i] = database.ProposalCredit{
+			c[i] = user.ProposalCredit{
 				PaywallID:     pp.ID,
 				Price:         pp.CreditPrice,
 				DatePurchased: time.Now().Unix(),
@@ -496,15 +496,15 @@ func (p *politeiawww) ProcessUserPaymentsRescan(upr v1.UserPaymentsRescan) (*v1.
 	// proposal credits since the start of this request. Failure to
 	// relookup the user record here could result in adding proposal
 	// credits to the user's account that have already been spent.
-	user, err = p.db.UserGet(user.Email)
+	u, err = p.db.UserGet(u.Email)
 	if err != nil {
 		return nil, fmt.Errorf("UserGet %v", err)
 	}
 
-	user.UnspentProposalCredits = append(user.UnspentProposalCredits,
+	u.UnspentProposalCredits = append(u.UnspentProposalCredits,
 		newCredits...)
 
-	err = p.db.UserUpdate(*user)
+	err = p.db.UserUpdate(*u)
 	if err != nil {
 		return nil, fmt.Errorf("UserUpdate %v", err)
 	}

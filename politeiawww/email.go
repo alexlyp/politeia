@@ -13,7 +13,7 @@ import (
 	"github.com/dajohi/goemail"
 
 	v1 "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
+	"github.com/decred/politeia/politeiawww/user"
 )
 
 func createBody(tpl *template.Template, tplData interface{}) (string, error) {
@@ -113,7 +113,7 @@ func (p *politeiawww) emailResetPasswordVerificationLink(email, token string) er
 
 // emailAuthorForVettedProposal sends an email notification for a new proposal
 // becoming vetted to the proposal's author.
-func (p *politeiawww) emailAuthorForVettedProposal(proposal *v1.ProposalRecord, authorUser *database.User, adminUser *database.User) error {
+func (p *politeiawww) emailAuthorForVettedProposal(proposal *v1.ProposalRecord, authorUser *user.User, adminUser *user.User) error {
 	if p.smtp.disabled {
 		return nil
 	}
@@ -146,7 +146,7 @@ func (p *politeiawww) emailAuthorForVettedProposal(proposal *v1.ProposalRecord, 
 
 // emailAuthorForCensoredProposal sends an email notification for a new
 // proposal becoming censored to the proposal's author.
-func (p *politeiawww) emailAuthorForCensoredProposal(proposal *v1.ProposalRecord, authorUser *database.User, adminUser *database.User) error {
+func (p *politeiawww) emailAuthorForCensoredProposal(proposal *v1.ProposalRecord, authorUser *user.User, adminUser *user.User) error {
 	if p.smtp.disabled {
 		return nil
 	}
@@ -179,7 +179,7 @@ func (p *politeiawww) emailAuthorForCensoredProposal(proposal *v1.ProposalRecord
 
 // emailUsersForVettedProposal sends an email notification for a new proposal
 // becoming vetted.
-func (p *politeiawww) emailUsersForVettedProposal(proposal *v1.ProposalRecord, authorUser *database.User, adminUser *database.User) error {
+func (p *politeiawww) emailUsersForVettedProposal(proposal *v1.ProposalRecord, authorUser *user.User, adminUser *user.User) error {
 	if p.smtp.disabled {
 		return nil
 	}
@@ -206,23 +206,23 @@ func (p *politeiawww) emailUsersForVettedProposal(proposal *v1.ProposalRecord, a
 
 	return p.smtp.sendEmail(subject, body, func(msg *goemail.Message) error {
 		// Add user emails to the goemail.Message
-		return p.db.AllUsers(func(user *database.User) {
+		return p.db.AllUsers(func(u *user.User) {
 			// Don't notify the user under certain conditions.
-			if user.NewUserPaywallTx == "" || user.Deactivated ||
-				user.ID == adminUser.ID || user.ID == authorUser.ID ||
-				(user.EmailNotifications&
+			if u.NewUserPaywallTx == "" || u.Deactivated ||
+				u.ID == adminUser.ID || u.ID == authorUser.ID ||
+				(u.EmailNotifications&
 					uint64(v1.NotificationEmailRegularProposalVetted)) == 0 {
 				return
 			}
 
-			msg.AddBCC(user.Email)
+			msg.AddBCC(u.Email)
 		})
 	})
 }
 
 // emailUsersForEditedProposal sends an email notification for a proposal being
 // edited.
-func (p *politeiawww) emailUsersForEditedProposal(proposal *v1.ProposalRecord, authorUser *database.User) error {
+func (p *politeiawww) emailUsersForEditedProposal(proposal *v1.ProposalRecord, authorUser *user.User) error {
 	if p.smtp.disabled {
 		return nil
 	}
@@ -250,23 +250,23 @@ func (p *politeiawww) emailUsersForEditedProposal(proposal *v1.ProposalRecord, a
 
 	return p.smtp.sendEmail(subject, body, func(msg *goemail.Message) error {
 		// Add user emails to the goemail.Message
-		return p.db.AllUsers(func(user *database.User) {
+		return p.db.AllUsers(func(u *user.User) {
 			// Don't notify the user under certain conditions.
-			if user.NewUserPaywallTx == "" || user.Deactivated ||
-				user.ID == authorUser.ID ||
-				(user.EmailNotifications&
+			if u.NewUserPaywallTx == "" || u.Deactivated ||
+				u.ID == authorUser.ID ||
+				(u.EmailNotifications&
 					uint64(v1.NotificationEmailRegularProposalEdited)) == 0 {
 				return
 			}
 
-			msg.AddBCC(user.Email)
+			msg.AddBCC(u.Email)
 		})
 	})
 }
 
 // emailUsersForProposalVoteStarted sends an email notification for a proposal
 // entering the voting state.
-func (p *politeiawww) emailUsersForProposalVoteStarted(proposal *v1.ProposalRecord, authorUser *database.User, adminUser *database.User) error {
+func (p *politeiawww) emailUsersForProposalVoteStarted(proposal *v1.ProposalRecord, authorUser *user.User, adminUser *user.User) error {
 	if p.smtp.disabled {
 		return nil
 	}
@@ -308,17 +308,17 @@ func (p *politeiawww) emailUsersForProposalVoteStarted(proposal *v1.ProposalReco
 
 	return p.smtp.sendEmail(subject, body, func(msg *goemail.Message) error {
 		// Add user emails to the goemail.Message
-		return p.db.AllUsers(func(user *database.User) {
+		return p.db.AllUsers(func(u *user.User) {
 			// Don't notify the user under certain conditions.
-			if user.NewUserPaywallTx == "" || user.Deactivated ||
-				user.ID == adminUser.ID ||
-				user.ID == authorUser.ID ||
-				(user.EmailNotifications&
+			if u.NewUserPaywallTx == "" || u.Deactivated ||
+				u.ID == adminUser.ID ||
+				u.ID == authorUser.ID ||
+				(u.EmailNotifications&
 					uint64(v1.NotificationEmailRegularProposalVoteStarted)) == 0 {
 				return
 			}
 
-			msg.AddBCC(user.Email)
+			msg.AddBCC(u.Email)
 		})
 	})
 }
@@ -348,18 +348,18 @@ func (p *politeiawww) emailAdminsForNewSubmittedProposal(token string, propName 
 
 	return p.smtp.sendEmail(subject, body, func(msg *goemail.Message) error {
 		// Add admin emails to the goemail.Message
-		return p.db.AllUsers(func(user *database.User) {
-			if !user.Admin || user.Deactivated ||
-				(user.EmailNotifications&
+		return p.db.AllUsers(func(u *user.User) {
+			if !u.Admin || u.Deactivated ||
+				(u.EmailNotifications&
 					uint64(v1.NotificationEmailAdminProposalNew) == 0) {
 				return
 			}
-			msg.AddBCC(user.Email)
+			msg.AddBCC(u.Email)
 		})
 	})
 }
 
-func (p *politeiawww) emailAdminsForProposalVoteAuthorized(proposal *v1.ProposalRecord, authorUser *database.User) error {
+func (p *politeiawww) emailAdminsForProposalVoteAuthorized(proposal *v1.ProposalRecord, authorUser *user.User) error {
 	if p.smtp.disabled {
 		return nil
 	}
@@ -385,20 +385,20 @@ func (p *politeiawww) emailAdminsForProposalVoteAuthorized(proposal *v1.Proposal
 
 	return p.smtp.sendEmail(subject, body, func(msg *goemail.Message) error {
 		// Add admin emails to the goemail.Message
-		return p.db.AllUsers(func(user *database.User) {
-			if !user.Admin || user.Deactivated ||
-				(user.EmailNotifications&
+		return p.db.AllUsers(func(u *user.User) {
+			if !u.Admin || u.Deactivated ||
+				(u.EmailNotifications&
 					uint64(v1.NotificationEmailAdminProposalVoteAuthorized) == 0) {
 				return
 			}
-			msg.AddBCC(user.Email)
+			msg.AddBCC(u.Email)
 		})
 	})
 }
 
 // emailAuthorForCommentOnProposal sends an email notification to a proposal
 // author for a new comment.
-func (p *politeiawww) emailAuthorForCommentOnProposal(proposal *v1.ProposalRecord, authorUser *database.User, commentID, username string) error {
+func (p *politeiawww) emailAuthorForCommentOnProposal(proposal *v1.ProposalRecord, authorUser *user.User, commentID, username string) error {
 	if p.smtp.disabled {
 		return nil
 	}
@@ -436,7 +436,7 @@ func (p *politeiawww) emailAuthorForCommentOnProposal(proposal *v1.ProposalRecor
 
 // emailAuthorForCommentOnComment sends an email notification to a comment
 // author for a new comment reply.
-func (p *politeiawww) emailAuthorForCommentOnComment(proposal *v1.ProposalRecord, authorUser *database.User, commentID, username string) error {
+func (p *politeiawww) emailAuthorForCommentOnComment(proposal *v1.ProposalRecord, authorUser *user.User, commentID, username string) error {
 	if p.smtp.disabled {
 		return nil
 	}

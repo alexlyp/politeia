@@ -31,8 +31,8 @@ import (
 	"github.com/decred/politeia/politeiad/cache"
 	"github.com/decred/politeia/politeiad/cache/cockroachdb"
 	v1 "github.com/decred/politeia/politeiawww/api/v1"
-	"github.com/decred/politeia/politeiawww/database"
-	"github.com/decred/politeia/politeiawww/database/localdb"
+	"github.com/decred/politeia/politeiawww/user"
+	"github.com/decred/politeia/politeiawww/user/localdb"
 	"github.com/decred/politeia/util"
 	"github.com/decred/politeia/util/version"
 	"github.com/google/uuid"
@@ -107,7 +107,7 @@ func (p *politeiawww) getSessionUUID(r *http.Request) (string, error) {
 }
 
 // getSessionUser retrieves the current session user from the database.
-func (p *politeiawww) getSessionUser(w http.ResponseWriter, r *http.Request) (*database.User, error) {
+func (p *politeiawww) getSessionUser(w http.ResponseWriter, r *http.Request) (*user.User, error) {
 	id, err := p.getSessionUUID(r)
 	if err != nil {
 		return nil, err
