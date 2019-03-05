@@ -11,6 +11,8 @@ type PropVoteStatusT int
 type UserManageActionT int
 type EmailNotificationT int
 
+type InvoiceStatusT int
+
 const (
 	PoliteiaWWWAPIVersion = 1 // API version this backend understands
 
@@ -250,6 +252,16 @@ const (
 	NotificationEmailAdminProposalVoteAuthorized EmailNotificationT = 1 << 6
 	NotificationEmailCommentOnMyProposal         EmailNotificationT = 1 << 7
 	NotificationEmailCommentOnMyComment          EmailNotificationT = 1 << 8
+
+	// Invoice status codes
+	InvoiceStatusInvalid  InvoiceStatusT = 0 // Invalid status
+	InvoiceStatusNotFound InvoiceStatusT = 1 // Invoice not found
+	InvoiceStatusNew      InvoiceStatusT = 2 // Invoice has not been reviewed
+	InvoiceStatusUpdated  InvoiceStatusT = 3 // Invoice has unreviewed changes
+	InvoiceStatusDisputed InvoiceStatusT = 4 // Invoice has been disputed for some reason
+	InvoiceStatusRejected InvoiceStatusT = 5 // Invoice fully rejected and closed
+	InvoiceStatusApproved InvoiceStatusT = 6 // Invoice has been approved
+	InvoiceStatusPaid     InvoiceStatusT = 7 // Invoice has been paid
 )
 
 var (
@@ -1210,5 +1222,22 @@ type NewInvoice struct {
 
 // NewInvoiceReply is used to reply to the NewInvoiceReply command.
 type NewInvoiceReply struct {
+	CensorshipRecord CensorshipRecord `json:"censorshiprecord"`
+}
+
+// InvoiceRecord is an entire invoice and its content.
+type InvoiceRecord struct {
+	Status             InvoiceStatusT `json:"status"`                       // Current status of invoice
+	StatusChangeReason string         `json:"statuschangereason,omitempty"` // Reason (if any) for the current status
+	Timestamp          int64          `json:"timestamp"`                    // Last update of invoice
+	Month              uint16         `json:"month"`                        // The month that this invoice applies to
+	Year               uint16         `json:"year"`                         // The year that this invoice applies to
+	UserID             string         `json:"userid"`                       // ID of user who submitted invoice
+	Username           string         `json:"username"`                     // Username of user who submitted invoice
+	PublicKey          string         `json:"publickey"`                    // User's public key, used to verify signature.
+	Signature          string         `json:"signature"`                    // Signature of file digest
+	Files              []File         `json:"file"`                         // Actual invoice file
+	Version            string         `json:"version"`                      // Record version
+
 	CensorshipRecord CensorshipRecord `json:"censorshiprecord"`
 }
