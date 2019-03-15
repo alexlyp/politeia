@@ -5,10 +5,14 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/decred/politeia/decredplugin"
 	pd "github.com/decred/politeia/politeiad/api/v1"
 	"github.com/decred/politeia/politeiad/cache"
 	www "github.com/decred/politeia/politeiawww/api/v1"
+	"github.com/decred/politeia/politeiawww/database"
 )
 
 func convertCastVoteReplyFromDecredPlugin(cvr decredplugin.CastVoteReply) www.CastVoteReply {
@@ -486,21 +490,67 @@ func convertInvoiceCensorFromWWW(f www.CensorshipRecord) pd.CensorshipRecord {
 	}
 }
 
-func convertInvoiceFileFromPD(files []pd.File) *www.File {
-	if len(files) == 0 {
-		return nil
-	}
-
-	return &www.File{
-		Digest:  files[0].Digest,
-		Payload: files[0].Payload,
-	}
-}
-
 func convertInvoiceCensorFromPD(f pd.CensorshipRecord) www.CensorshipRecord {
 	return www.CensorshipRecord{
 		Token:     f.Token,
 		Merkle:    f.Merkle,
 		Signature: f.Signature,
 	}
+}
+
+func convertRecordFileToWWW(f pd.File) www.File {
+	return www.File{
+		Name:    f.Name,
+		MIME:    f.MIME,
+		Digest:  f.Digest,
+		Payload: f.Payload,
+	}
+}
+
+func convertRecordFilesToWWW(f []pd.File) []www.File {
+	files := make([]www.File, 0, len(f))
+	for _, v := range f {
+		files = append(files, convertRecordFileToWWW(v))
+	}
+	return files
+}
+
+func convertRecordToDatabaseInvoice(p pd.Record) (*database.Invoice, error) {
+	dbInvoice := database.Invoice{
+		Files:           convertRecordFilesToWWW(p.Files),
+		Token:           p.CensorshipRecord.Token,
+		ServerSignature: p.CensorshipRecord.Signature,
+		Version:         p.Version,
+	}
+	for _, m := range p.Metadata {
+		switch m.ID {
+		case mdStreamGeneral:
+			var mdGeneral BackendInvoiceMetadata
+			err := json.Unmarshal([]byte(m.Payload), &mdGeneral)
+			if err != nil {
+				return nil, fmt.Errorf("could not decode metadata '%v' token '%v': %v",
+					p.Metadata, p.CensorshipRecord.Token, err)
+			}
+
+			dbInvoice.Month = mdGeneral.Month
+			dbInvoice.Year = mdGeneral.Year
+			dbInvoice.Timestamp = mdGeneral.Timestamp
+			dbInvoice.PublicKey = mdGeneral.PublicKey
+			dbInvoice.UserSignature = mdGeneral.Signature
+
+			/*dbInvoice.UserID, err = c.db.GetUserIdByPublicKey(mdGeneral.PublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not get user id from public key %v",
+					mdGeneral.PublicKey)
+			}
+			*/
+		default:
+			// Log error but proceed
+			log.Errorf("initializeInventory: invalid "+
+				"metadata stream ID %v token %v",
+				m.ID, p.CensorshipRecord.Token)
+		}
+	}
+
+	return &dbInvoice, nil
 }

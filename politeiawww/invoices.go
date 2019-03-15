@@ -20,6 +20,7 @@ import (
 	pd "github.com/decred/politeia/politeiad/api/v1"
 	"github.com/decred/politeia/politeiad/api/v1/identity"
 	www "github.com/decred/politeia/politeiawww/api/v1"
+	"github.com/decred/politeia/politeiawww/database"
 	"github.com/decred/politeia/politeiawww/user"
 	"github.com/decred/politeia/util"
 )
@@ -139,7 +140,15 @@ func (p *politeiawww) ProcessNewInvoice(ni www.NewInvoice, u *user.User) (*www.N
 	if err != nil {
 		return nil, err
 	}
-
+	r := pd.Record{}
+	ir, err := convertRecordToDatabaseInvoice(r)
+	if err != nil {
+		return nil, err
+	}
+	err = database.NewInvoice(ir)
+	if err != nil {
+		return nil, err
+	}
 	cr := convertPropCensorFromPD(pdReply.CensorshipRecord)
 
 	// Fire off new proposal event
