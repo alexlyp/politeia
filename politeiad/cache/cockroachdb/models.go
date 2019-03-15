@@ -4,8 +4,6 @@
 
 package cockroachdb
 
-import "time"
-
 // Version describes the version of a record or plugin that the database is
 // currently using.
 type Version struct {
@@ -170,74 +168,4 @@ type CastVote struct {
 // TableName returns the name of the CastVote database table.
 func (CastVote) TableName() string {
 	return tableCastVotes
-}
-
-type Invoice struct {
-	Token              string           `gorm:"primary_key;size:64"`
-	UserID             uint             `gorm:"not_null"`
-	Month              uint             `gorm:"not_null"`
-	Year               uint             `gorm:"not_null"`
-	Timestamp          time.Time        `gorm:"not_null"`
-	Status             uint             `gorm:"not_null"`
-	StatusChangeReason string           `gorm:"not_null"`
-	Files              []File           `gorm:"foreignkey:RecordKey"` // User provided files
-	PublicKey          string           `gorm:"not_null"`
-	UserSignature      string           `gorm:"not_null"`
-	ServerSignature    string           `gorm:"not_null"`
-	Proposal           string           `gorm:"not_null"`
-	Version            string           `gorm:"not_null"`
-	LineItems          []LineItem       `gorm:"not_null"`
-	Changes            []InvoiceChange  `gorm:"not_null"`
-	Payments           []InvoicePayment `gorm:"not_null"`
-}
-
-func (Invoice) TableName() string {
-	return tableInvoices
-}
-
-type InvoiceChange struct {
-	Key            uint      `gorm:"primary_key"`      // Primary key
-	Token          string    `gorm:"not null;size:64"` // Censorship token
-	AdminPublicKey string    `gorm:"not null;size:64"` // Key used for signature
-	NewStatus      uint      `gorm:"not null"`         // Updated status
-	Timestamp      time.Time `gorm:"not null"`         // Received UNIX timestamp
-}
-
-func (InvoiceChange) TableName() string {
-	return tableInvoiceChange
-}
-
-type InvoicePayment struct {
-	Key         uint   `gorm:"primary_key"`      // Primary key
-	Token       string `gorm:"not null;size:64"` // Censorship token
-	IsTotalCost bool   `gorm:"not_null"`         // Is this the entire payment for an invoice
-	Address     string `gorm:"not_null"`         // Address paid to by the payment
-	Amount      uint   `gorm:"not_null"`         // Amount paid by the payment
-	TxNotBefore int64  `gorm:"not_null"`         // ???
-	PollExpiry  int64  `gorm:"not_null"`         // ???
-	TxID        string `gorm:"not_null"`         // Transaction Hash of the payment
-}
-
-func (InvoicePayment) TableName() string {
-	return tableInvoicePayments
-}
-
-// LineItem is contains all the information about line items contained in Invoices
-// that are currently records and entries in the database
-type LineItem struct {
-	Key         string `gorm:"primary_key;size:64"` // Identifying line item token
-	Token       string `gorm:"not null"`            // Invoice's Censorship token
-	LineNumber  uint   `gorm:"not null"`            // Invoice line number
-	Type        string `gorm:"not null"`            // Type of work being submitted
-	SubType     string `gorm:"not null"`            // Subtype of work (if necessary)
-	Description string `gorm:"not null"`            // Description of work being completed
-	Hours       uint   `gorm:"not null"`            // Number of hours worked (if necessary)
-	Rate        int64  `gorm:"not null"`            // Hourly Rate of work (if necessary)
-	TotalCost   int64  `gorm:"not null"`            // Total Cost of the Line Item
-	Proposal    string `gorm:"not null"`            // Token of related proposal (if necessary)
-}
-
-// TableName returns the name of the LineItem database table.
-func (LineItem) TableName() string {
-	return tableLineItems
 }
