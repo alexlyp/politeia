@@ -27,6 +27,7 @@ import (
 	"github.com/decred/politeia/politeiad/cache"
 	"github.com/decred/politeia/politeiad/cache/cockroachdb"
 	v1 "github.com/decred/politeia/politeiawww/api/v1"
+	cmsdb "github.com/decred/politeia/politeiawww/database/cockroachdb"
 	"github.com/decred/politeia/politeiawww/user/localdb"
 	"github.com/decred/politeia/util"
 	"github.com/decred/politeia/util/version"
@@ -439,7 +440,13 @@ func _main() error {
 		p.setPoliteiaWWWRoutes()
 	case cmsWWWMode:
 		p.setCMSWWWRoutes()
-		p.cmsDb.Setup()
+		cockroachdb.UseLogger(cockroachdbLog)
+		net := filepath.Base(p.cfg.DataDir)
+		p.cmsDb, err = cmsdb.New(cmsdb.UserCmsdb, p.cfg.CmsHost,
+			net, p.cfg.CmsRootCert, p.cfg.CmsCert, p.cfg.CmsKey)
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unknown mode %v:", p.cfg.Mode)
 	}

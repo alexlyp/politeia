@@ -6,6 +6,8 @@ package cockroachdb
 
 import (
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"sync"
 
 	"github.com/decred/politeia/decredplugin"
@@ -15,13 +17,15 @@ import (
 )
 
 const (
-	cacheID      = "records"
-	cacheVersion = "1"
+	cacheID    = "invoice"
+	cmsVersion = "1"
 
 	// Database table names
 	tableNameInvoice        = "invoices"
 	tableNameInvoiceChange  = "invoice_changes"
 	tableNameInvoicePayment = "invoice_payments"
+
+	UserCmsdb = "invoices_cmsdb" // cmsdb user (read/write access)
 )
 
 // cockroachdb implements the cache interface.
@@ -154,4 +158,72 @@ func (c *cockroachdb) Setup() error {
 	}
 
 	return tx.Commit().Error
+}
+
+func buildQueryString(user, rootCert, cert, key string) string {
+	v := url.Values{}
+	v.Set("ssl", "true")
+	v.Set("sslmode", "require")
+	v.Set("sslrootcert", filepath.Clean(rootCert))
+	v.Set("sslcert", filepath.Join(cert))
+	v.Set("sslkey", filepath.Join(key))
+	return v.Encode()
+}
+
+// New returns a new cockroachdb context that contains a connection to the
+// specified database that was made using the passed in user and certificates.
+func New(user, host, net, rootCert, cert, key string) (*cockroachdb, error) {
+	log.Tracef("New: %v %v %v %v %v %v", user, host, net, rootCert, cert, key)
+
+	// Connect to database
+	dbName := cacheID + "_" + net
+	h := "postgresql://" + user + "@" + host + "/" + dbName
+	u, err := url.Parse(h)
+	if err != nil {
+		return nil, fmt.Errorf("parse url '%v': %v", h, err)
+	}
+
+	qs := buildQueryString(u.User.String(), rootCert, cert, key)
+	addr := u.String() + "?" + qs
+	db, err := gorm.Open("postgres", addr)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database '%v': %v", addr, err)
+	}
+
+	// Create context
+	c := &cockroachdb{
+		recordsdb: db,
+	}
+
+	// Disable gorm logging. This prevents duplicate errors from
+	// being printed since we handle errors manually.
+	c.recordsdb.LogMode(false)
+
+	// Disable automatic table name pluralization. We set table
+	// names manually.
+	c.recordsdb.SingularTable(true)
+
+	/*
+		// Ensure we're using the correct cache version.
+		var v Version
+		if c.recordsdb.HasTable(tableVersions) {
+			err = c.recordsdb.
+				Where("id = ?", cacheID).
+				Find(&v).
+				Error
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Return an error if the version is incorrect, but also
+		// return the database context so that the cache can be
+		// rebuilt.
+		if v.Version != cmsVersion {
+			err = cache.ErrWrongVersion
+		}
+
+		log.Infof("Cache host: %v", h)
+	*/
+	return c, err
 }

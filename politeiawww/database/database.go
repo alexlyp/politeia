@@ -29,20 +29,11 @@ type Database interface {
 
 	InvoiceByToken(string) (*Invoice, error) // Return invoice given its token
 
-	Invoices(InvoicesRequest) ([]Invoice, int, error) // Return a list of invoices
-
-	NewInvoicePayment(*InvoicePayment) error
-
-	UpdateInvoicePayment(*InvoicePayment) error // Update an existing invoice's payment
-
-	// Get the latest version of all invoices
-	Inventory() ([]Invoice, error)
-
 	// Setup the invoice tables
 	Setup() error
 
 	// Build the invoice tables from scratch (from inventory of d)
-	Build([]Invoice) error
+	Build(string) error
 
 	// Close performs cleanup of the backend.
 	Close() error
