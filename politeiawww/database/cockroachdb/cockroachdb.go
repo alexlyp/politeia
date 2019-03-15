@@ -22,10 +22,6 @@ const (
 	tableNameInvoice        = "invoices"
 	tableNameInvoiceChange  = "invoice_changes"
 	tableNameInvoicePayment = "invoice_payments"
-
-	// Database users
-	UserPoliteiad   = "records_politeiad"   // politeiad user (read/write access)
-	UserPoliteiawww = "records_politeiawww" // politeiawww user (read access)
 )
 
 // cockroachdb implements the cache interface.

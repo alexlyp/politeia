@@ -439,6 +439,7 @@ func _main() error {
 		p.setPoliteiaWWWRoutes()
 	case cmsWWWMode:
 		p.setCMSWWWRoutes()
+		p.cmsDb.Setup()
 	default:
 		return fmt.Errorf("unknown mode %v:", p.cfg.Mode)
 	}
