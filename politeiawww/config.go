@@ -125,7 +125,7 @@ type config struct {
 	VoteDurationMax          uint32 `long:"votedurationmax" description:"Maximum duration of a proposal vote in blocks"`
 	AdminLogFile             string `long:"adminlogfile" description:"admin log filename (Default: admin.log)"`
 	Mode                     string `long:"mode" description:"Mode www runs as. Supported values: piwww, cmswww"`
-	CmsHost                  string `long:"cnshost" description:"Cms ip:port"`
+	CmsHost                  string `long:"cmshost" description:"Cms ip:port"`
 	CmsRootCert              string `long:"cmsrootcert" description:"File containing the CA certificate for the cmsdb"`
 	CmsCert                  string `long:"cmscert" description:"File containing the politeiawww client certificate for the cmsdb"`
 	CmsKey                   string `long:"cmskey" description:"File containing the politeiawww client certificate key for the cmsdb"`

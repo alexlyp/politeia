@@ -117,9 +117,9 @@ You can also use the following default configurations:
     cachecert="~/.cockroachdb/certs/clients/records_politeiawww/client.records_politeiawww.crt"
     cachekey="~/.cockroachdb/certs/clients/records_politeiawww/client.records_politeiawww.key"
     cmshost=localhost:26258
-    cmsrootcert="~/.cmsdb/certs/clients/invoices_cmsdb/ca.crt"
-    cmscert="~/.cmsdb/certs/clients/invoices_cmsdb/client.invoices_cmsdb.crt"
-    cmskey="~/.cmsdb/certs/clients/invoices_cmsdb/client.invoices_cmsdb.key"
+    cmsrootcert="~/.cockroachdb/certs/clients/invoices_cmsdb/ca.crt"
+    cmscert="~/.cockroachdb/certs/clients/invoices_cmsdb/client.invoices_cmsdb.crt"
+    cmskey="~/.cockroachdb/certs/clients/invoices_cmsdb/client.invoices_cmsdb.key"
 
 **Things to note:**
 
