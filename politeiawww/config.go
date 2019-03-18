@@ -505,6 +505,11 @@ func loadConfig() (*config, []string, error) {
 		case cfg.CmsKey == "":
 			return nil, nil, fmt.Errorf("the cmskey param is required, while in cmswww mode")
 		}
+
+		cfg.CmsRootCert = cleanAndExpandPath(cfg.CmsRootCert)
+		cfg.CmsCert = cleanAndExpandPath(cfg.CmsCert)
+		cfg.CmsKey = cleanAndExpandPath(cfg.CmsKey)
+
 	case politeiaWWWMode:
 	default:
 		err := fmt.Errorf("invalid mode: %v", cfg.Mode)
