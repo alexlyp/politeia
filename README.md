@@ -233,7 +233,7 @@ manually you can do so by opening a sql shell.
 #### 4a. Setup cms database:
 
     cd $GOPATH/src/github.com/decred/politeia
-    ./cmscerts.sh ~/.cmsdb
+    ./cmscerts.sh ~/.cockroachdb
 
     cockroach start \
       --certs-dir=${HOME}/.cmsdb/certs/node \
@@ -242,7 +242,7 @@ manually you can do so by opening a sql shell.
       --http-addr=localhost:8081
 
     cd $GOPATH/src/github.com/decred/politeia
-    ./cmssetup.sh ~/.cmsdb/certs/clients/root
+    ./cmssetup.sh ~/.cockroachdb/certs/clients/root
     
 
 #### 5. Build the programs:
