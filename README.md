@@ -238,11 +238,11 @@ manually you can do so by opening a sql shell.
     cockroach start \
       --certs-dir=${HOME}/.cmsdb/certs/node \
       --listen-addr=localhost:26258 \
-      --store=${HOME}/.cmsdb/data
+      --store=${HOME}/.cmsdb/data \
       --http-addr=localhost:8081
 
     cd $GOPATH/src/github.com/decred/politeia
-    ./cmssetup.sh ~/.cockroachdb/certs/clients/root
+    ./cmssetup.sh ~/.cmsdb/certs/clients/root
     
 
 #### 5. Build the programs:
