@@ -447,6 +447,10 @@ func _main() error {
 		if err != nil {
 			return err
 		}
+		err = p.cmsDb.Setup()
+		if err != nil {
+			return fmt.Errorf("cmsdb setup: %v", err)
+		}
 	default:
 		return fmt.Errorf("unknown mode %v:", p.cfg.Mode)
 	}

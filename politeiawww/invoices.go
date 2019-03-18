@@ -139,7 +139,12 @@ func (p *politeiawww) ProcessNewInvoice(ni www.NewInvoice, u *user.User) (*www.N
 	if err != nil {
 		return nil, err
 	}
-	r := pd.Record{}
+
+	r := pd.Record{
+		Metadata:         n.Metadata,
+		Files:            n.Files,
+		CensorshipRecord: pdReply.CensorshipRecord,
+	}
 	ir, err := convertRecordToDatabaseInvoice(r)
 	if err != nil {
 		return nil, err
