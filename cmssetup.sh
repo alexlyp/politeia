@@ -11,8 +11,8 @@ set -ex
 readonly CERTS_DIR=$1
 
 # Database names.
-readonly DB_MAINNET="records_mainnet"
-readonly DB_TESTNET="records_testnet3"
+readonly DB_MAINNET="cms_mainnet"
+readonly DB_TESTNET="cms_testnet3"
 
 # Database user names.
 readonly 	USER_CMS="invoices_cmsdb" 

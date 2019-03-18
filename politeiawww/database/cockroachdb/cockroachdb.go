@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	cacheID    = "invoice"
+	cacheID    = "cms"
 	cmsVersion = "1"
 
 	// Database table names
