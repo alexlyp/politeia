@@ -701,7 +701,7 @@ func (p *politeiawww) processEditInvoice(ei cms.EditInvoice, u *user.User) (*cms
 		return nil, err
 	}
 
-	err = p.cmsDb.UpdateInvoice(dbInvoice)
+	err = p.cmsDB.UpdateInvoice(dbInvoice)
 	if err != nil {
 		return nil, err
 	}
@@ -765,10 +765,7 @@ func (p *politeiawww) processUserInvoices(user *user.User) (*cms.UserInvoicesRep
 			return nil, err
 		}
 
-		invRec, err := convertDatabaseInvoiceToInvoiceRecord(inv)
-		if err != nil {
-			return nil, err
-		}
+		invRec := convertDatabaseInvoiceToInvoiceRecord(inv)
 		invRec.Username = p.getUsernameById(invRec.UserID)
 
 		// Get raw record information from d cache
@@ -821,10 +818,7 @@ func (p *politeiawww) processAdminInvoices(ai cms.AdminInvoices, user *user.User
 			return nil, err
 		}
 
-		invRec, err := convertDatabaseInvoiceToInvoiceRecord(inv)
-		if err != nil {
-			return nil, err
-		}
+		invRec := convertDatabaseInvoiceToInvoiceRecord(inv)
 		invRec.Username = p.getUsernameById(invRec.UserID)
 
 		// Get raw record information from d cache
