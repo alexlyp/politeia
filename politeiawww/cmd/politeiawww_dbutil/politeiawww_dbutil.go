@@ -80,6 +80,7 @@ var (
 	stubUsers  = flag.Bool("stubusers", false, "")
 	migrate    = flag.Bool("migrate", false, "")
 	createKey  = flag.Bool("createkey", false, "")
+	fixCMS     = flag.Bool("fixcms", false, "")
 
 	network string // Mainnet or testnet3
 	// XXX ldb should be abstracted away. dbutil commands should use
@@ -271,6 +272,36 @@ func cmdSetAdmin() error {
 		return cockroachSetAdmin(args[0], isAdmin)
 	}
 
+	return nil
+}
+
+func cmdFixCMS() error {
+	args := flag.Args()
+	email := args[0]
+	b, err := ldb.Get([]byte(email), nil)
+	if err != nil {
+		return fmt.Errorf("user email '%v' not found", "")
+	}
+
+	u, err := user.DecodeUser(b)
+	if err != nil {
+		return err
+	}
+
+	u.Username = u.Email
+
+	b, err = user.EncodeUser(*u)
+	if err != nil {
+		return err
+	}
+
+	err = ldb.Put([]byte(email), b, nil)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("User with email '%v' has username set to that as well."+
+		"to %v\n", u.Email, u.Email)
 	return nil
 }
 
@@ -804,6 +835,8 @@ func _main() error {
 		return cmdMigrate()
 	case *createKey:
 		return cmdCreateKey()
+	case *fixCMS:
+		return cmdFixCMS()
 	default:
 		flag.Usage()
 	}
