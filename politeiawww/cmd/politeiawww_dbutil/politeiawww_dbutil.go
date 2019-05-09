@@ -280,15 +280,18 @@ func cmdFixCMS() error {
 	email := args[0]
 	b, err := ldb.Get([]byte(email), nil)
 	if err != nil {
-		return fmt.Errorf("user email '%v' not found", "")
+		return fmt.Errorf("user email '%v' not found", email)
 	}
 
 	u, err := user.DecodeUser(b)
 	if err != nil {
 		return err
 	}
-
-	u.Username = u.Email
+	if u.Username == "" {
+		u.Username = u.Email
+	} else {
+		return fmt.Errorf("user email '%v' has username already set to %v", email, u.Username)
+	}
 
 	b, err = user.EncodeUser(*u)
 	if err != nil {
