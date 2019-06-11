@@ -1750,6 +1750,54 @@ func (c *Client) CMSEditUser(uui cms.EditUser) (*cms.EditUserReply, error) {
 	return &eur, nil
 }
 
+// NewDCC creates a new dcc proposal.
+func (c *Client) NewDCC(nd cms.NewDCC) (*cms.NewDCCReply, error) {
+	responseBody, err := c.makeRequest("POST", cms.RouteNewDCC,
+		nd)
+	if err != nil {
+		return nil, err
+	}
+
+	var ndr cms.NewDCCReply
+	err = json.Unmarshal(responseBody, &ndr)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal NewDCCReply: %v", err)
+	}
+
+	if c.cfg.Verbose {
+		err := prettyPrintJSON(ndr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &ndr, nil
+}
+
+// NewDCCUser creates a new user that is used for dcc nomination
+func (c *Client) NewDCCUser(ndu cms.NewDCCUser) (*cms.NewDCCUserReply, error) {
+	responseBody, err := c.makeRequest("POST", cms.RouteNewDCCUser,
+		ndu)
+	if err != nil {
+		return nil, err
+	}
+
+	var ndur cms.NewDCCUserReply
+	err = json.Unmarshal(responseBody, &ndur)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal NewDCCReply: %v", err)
+	}
+
+	if c.cfg.Verbose {
+		err := prettyPrintJSON(ndur)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &ndur, nil
+}
+
 // Close all client connections.
 func (c *Client) Close() {
 	if c.conn != nil {

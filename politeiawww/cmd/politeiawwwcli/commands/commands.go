@@ -83,10 +83,12 @@ type Cmds struct {
 	Login               LoginCmd               `command:"login" description:"(public) login to Politeia"`
 	Logout              LogoutCmd              `command:"logout" description:"(public) logout of Politeia"`
 	Me                  MeCmd                  `command:"me" description:"(user)   get user details for the logged in user"`
+	NewDCC              NewDCCCmd              `command:"newdcc" description:"(user)   creates a new dcc proposal"`
 	NewInvoice          NewInvoiceCmd          `command:"newinvoice" description:"(user)   create a new invoice"`
 	NewProposal         NewProposalCmd         `command:"newproposal" description:"(user)   create a new proposal"`
 	NewComment          NewCommentCmd          `command:"newcomment" description:"(user)   create a new proposal comment"`
 	NewUser             NewUserCmd             `command:"newuser" description:"(public) create a new user"`
+	NewDCCUser          NewDCCUserCmd          `command:"newdccuser" description:"(user) create a new dcc user"`
 	PayInvoices         PayInvoicesCmd         `command:"payinvoices" description:"(admin) set all approved invoices to paid"`
 	Policy              PolicyCmd              `command:"policy" description:"(public) get the server policy"`
 	ProposalComments    ProposalCommentsCmd    `command:"proposalcomments" description:"(public) get the comments for a proposal"`
