@@ -391,7 +391,7 @@ func (p *politeiawww) validateDCC(nd cms.NewDCC, u *user.User) error {
 	return nil
 }
 
-// formatSponsorStatement normalizes a sponsor statment without leading and
+// formatSponsorStatement normalizes a sponsor statement without leading and
 // trailing spaces.
 func formatSponsorStatement(statement string) string {
 	return strings.TrimSpace(statement)
@@ -756,9 +756,10 @@ func (p *politeiawww) processGetDCCs(gds cms.GetDCCs) (*cms.GetDCCsReply, error)
 	}
 
 	dccs := make([]cms.DCCRecord, 0, len(dbDCCs))
-	for _, _ = range dbDCCs {
-		// convertDCCDatabaseToRecord(v)
-	}
+
+	//for _, _ = range dbDCCs {
+	// convertDCCDatabaseToRecord(v)
+	//}
 
 	return &cms.GetDCCsReply{
 		DCCs: dccs,

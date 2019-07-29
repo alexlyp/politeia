@@ -523,7 +523,6 @@ func (p *politeiawww) handleNewDCC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, ndr)
-	return
 }
 
 func (p *politeiawww) handleSupportDCC(w http.ResponseWriter, r *http.Request) {
@@ -553,7 +552,6 @@ func (p *politeiawww) handleSupportDCC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, sdr)
-	return
 }
 
 func (p *politeiawww) handleOpposeDCC(w http.ResponseWriter, r *http.Request) {
@@ -583,7 +581,6 @@ func (p *politeiawww) handleOpposeDCC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, odr)
-	return
 }
 
 func (p *politeiawww) handleGetDCC(w http.ResponseWriter, r *http.Request) {
@@ -613,7 +610,6 @@ func (p *politeiawww) handleGetDCC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, gdr)
-	return
 }
 
 func (p *politeiawww) handleGetDCCs(w http.ResponseWriter, r *http.Request) {
@@ -643,7 +639,6 @@ func (p *politeiawww) handleGetDCCs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, gdsr)
-	return
 }
 
 func (p *politeiawww) handleApproveDCC(w http.ResponseWriter, r *http.Request) {
@@ -673,7 +668,6 @@ func (p *politeiawww) handleApproveDCC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, adr)
-	return
 }
 
 func (p *politeiawww) handleRejectDCC(w http.ResponseWriter, r *http.Request) {
@@ -703,7 +697,6 @@ func (p *politeiawww) handleRejectDCC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, rdr)
-	return
 }
 
 func (p *politeiawww) handleNewDCCUser(w http.ResponseWriter, r *http.Request) {
@@ -733,7 +726,6 @@ func (p *politeiawww) handleNewDCCUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, ndur)
-	return
 }
 
 func (p *politeiawww) setCMSWWWRoutes() {
