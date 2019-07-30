@@ -30,6 +30,7 @@ const (
 	RouteOpposeDCC           = "/dcc/oppose"
 	RouteGetDCC              = "/dcc/token"
 	RouteGetDCCs             = "/dcc/status"
+	RouteNewCommentDCC       = "/dcc/comment"
 	RouteApproveDCC          = "/admin/approvedcc"
 	RouteRejectDCC           = "/admin/rejectdcc"
 	RouteAdminInvoices       = "/admin/invoices"

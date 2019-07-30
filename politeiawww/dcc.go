@@ -1010,3 +1010,122 @@ func stringInSlice(arr []string, str string) bool {
 
 	return false
 }
+
+// processNewCommentDCC sends a new comment decred plugin command to politeaid
+// then fetches the new comment from the cache and returns it.
+func (p *politeiawww) processNewCommentDCC(nc www.NewComment, u *user.User) (*www.NewCommentReply, error) {
+	log.Tracef("processNewCommentDCC: %v %v", nc.Token, u.ID)
+
+	dcc, err := p.getDCC(nc.Token)
+	if err != nil {
+		if err == cache.ErrRecordNotFound {
+			err = www.UserError{
+				ErrorCode: cms.ErrorStatusInvoiceNotFound,
+			}
+		}
+		return nil, err
+	}
+
+	// Check to make sure the user is either an admin or the
+	// author of the invoice.
+	if !u.Admin && (dcc.SponsorUsername != u.Username) {
+		return nil, www.UserError{
+			ErrorCode: www.ErrorStatusUserActionNotAllowed,
+		}
+	}
+
+	// Ensure the public key is the user's active key
+	if nc.PublicKey != u.PublicKey() {
+		return nil, www.UserError{
+			ErrorCode: www.ErrorStatusInvalidSigningKey,
+		}
+	}
+
+	// Validate signature
+	msg := nc.Token + nc.ParentID + nc.Comment
+	err = validateSignature(nc.PublicKey, nc.Signature, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Don't allow comments of just "aye" or "nay" that would be confused
+	// with support or opposition.
+	if nc.Comment == sponsorString || nc.Comment == opposeString {
+		return nil, www.UserError{
+			ErrorCode: www.ErrorStatusUserActionNotAllowed,
+		}
+	}
+
+	// Validate comment
+	err = validateComment(nc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check to make sure that dcc isn't already approved.
+	if dcc.Status != cms.DCCStatusActive {
+		return nil, www.UserError{
+			ErrorCode: www.ErrorStatusCannotCommentOnProp,
+		}
+	}
+
+	// Setup plugin command
+	challenge, err := util.Random(pd.ChallengeSize)
+	if err != nil {
+		return nil, err
+	}
+
+	dnc := convertNewCommentToDecredPlugin(nc)
+	payload, err := decredplugin.EncodeNewComment(dnc)
+	if err != nil {
+		return nil, err
+	}
+
+	pc := pd.PluginCommand{
+		Challenge: hex.EncodeToString(challenge),
+		ID:        decredplugin.ID,
+		Command:   decredplugin.CmdNewComment,
+		CommandID: decredplugin.CmdNewComment,
+		Payload:   string(payload),
+	}
+
+	// Send polieiad request
+	responseBody, err := p.makeRequest(http.MethodPost,
+		pd.PluginCommandRoute, pc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle response
+	var reply pd.PluginCommandReply
+	err = json.Unmarshal(responseBody, &reply)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal "+
+			"PluginCommandReply: %v", err)
+	}
+
+	err = util.VerifyChallenge(p.cfg.Identity, challenge, reply.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	ncr, err := decredplugin.DecodeNewCommentReply([]byte(reply.Payload))
+	if err != nil {
+		return nil, err
+	}
+
+	// Add comment to commentScores in-memory cache
+	p.Lock()
+	p.commentScores[nc.Token+ncr.CommentID] = 0
+	p.Unlock()
+
+	// Get comment from cache
+	c, err := p.getComment(nc.Token, ncr.CommentID)
+	if err != nil {
+		return nil, fmt.Errorf("getComment: %v", err)
+	}
+
+	return &www.NewCommentReply{
+		Comment: *c,
+	}, nil
+}
