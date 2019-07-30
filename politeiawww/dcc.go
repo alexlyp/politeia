@@ -46,7 +46,7 @@ const (
 )
 
 var (
-	validSponsorStatment      = regexp.MustCompile(createSponsorStatementRegex())
+	validSponsorStatement     = regexp.MustCompile(createSponsorStatementRegex())
 	validDCCStatusTransitions = map[cms.DCCStatusT][]cms.DCCStatusT{
 		cms.DCCStatusActive: {
 			cms.DCCStatusSponsored,
@@ -405,15 +405,16 @@ func validateSponsorStatement(statement string) bool {
 			statement, formatSponsorStatement(statement))
 		return false
 	}
-	if len(statement) > cms.PolicyMinSponsorStatementLength ||
-		len(statement) < cms.PolicyMaxSponsorStatementLength {
-		log.Tracef("validateSponsorStatement: not within bounds: %s",
-			statement)
+	if len(statement) > cms.PolicyMaxSponsorStatementLength ||
+		len(statement) < cms.PolicyMinSponsorStatementLength {
+		log.Tracef("validateSponsorStatement: not within bounds: have %v expected > %v < %v",
+			len(statement), cms.PolicyMaxSponsorStatementLength,
+			cms.PolicyMinSponsorStatementLength)
 		return false
 	}
-	if !validSponsorStatment.MatchString(statement) {
+	if !validSponsorStatement.MatchString(statement) {
 		log.Tracef("validateSponsorStatement: not valid: %s %s",
-			statement, validSponsorStatment.String())
+			statement, validSponsorStatement.String())
 		return false
 	}
 	return true
