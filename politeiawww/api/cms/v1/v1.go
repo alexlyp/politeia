@@ -86,7 +86,7 @@ const (
 	// DCC status types
 	DCCStatusInvalid   DCCStatusT = 0 // Invalid issuance/revocation status
 	DCCStatusActive    DCCStatusT = 1 // Currently active issuance/revocation (awaiting sponsors)
-	DCCStatusSponsored DCCStatusT = 2 // Fully sponsored issuance/revocation (received enough sponsors to proceed)
+	DCCStatusSupported DCCStatusT = 2 // Fully supported issuance/revocation (received enough sponsors to proceed)
 	DCCStatusApproved  DCCStatusT = 3 // Approved issuance/revocation
 	DCCStatusRejected  DCCStatusT = 4 // Rejected issuance/revocation?  In the event of a Debate this would be result of a rejected issuance/revocation (that would override the mere sponsoring).
 	DCCStatusDebate    DCCStatusT = 5 // If a issuance/revocation receives enough comments, it would enter a "debate" status that would require a full contractor vote (to be added later).
@@ -581,8 +581,8 @@ type DCCRecord struct {
 	SponsorUserID      string     `json:"sponsoruserid"`      // The userid of the sponsoring user.
 	SponsorUsername    string     `json:"sponsorusername"`    // The username of the sponsoring user.
 
-	SupportUserIDs   []string `json:"supportuserids"` // List of UserIDs for those that have shown support of the DCC.
-	OppositionserIDs []string `json:"againstuserids"` // List of UserIDs for those that have shown opposition of the DCC.
+	SupportUserIDs    []string `json:"supportuserids"` // List of UserIDs for those that have shown support of the DCC.
+	OppositionUserIDs []string `json:"againstuserids"` // List of UserIDs for those that have shown opposition of the DCC.
 
 	CensorshipRecord www.CensorshipRecord `json:"censorshiprecord"`
 }

@@ -49,11 +49,11 @@ var (
 	validSponsorStatement     = regexp.MustCompile(createSponsorStatementRegex())
 	validDCCStatusTransitions = map[cms.DCCStatusT][]cms.DCCStatusT{
 		cms.DCCStatusActive: {
-			cms.DCCStatusSponsored,
+			cms.DCCStatusSupported,
 			cms.DCCStatusRejected,
 			cms.DCCStatusDebate,
 		},
-		cms.DCCStatusSponsored: {
+		cms.DCCStatusSupported: {
 			cms.DCCStatusApproved,
 			cms.DCCStatusRejected,
 		},
@@ -514,8 +514,41 @@ func (p *politeiawww) getDCC(token string) (*cms.DCCRecord, error) {
 		i.SponsorUserID = u.ID.String()
 		i.SponsorUsername = u.Username
 	}
-
+	support, oppose, err := p.getDCCSupportOppositionComments(token)
+	if err != nil {
+		log.Errorf("getDCC: %v", err)
+	}
+	i.SupportUserIDs = support
+	i.OppositionUserIDs = oppose
 	return &i, nil
+}
+
+func (p *politeiawww) getDCCSupportOppositionComments(token string) ([]string, []string, error) {
+	log.Tracef("getDCCSupportOpposition: %v", token)
+
+	dc, err := p.decredGetComments(token)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decredGetComments: %v", err)
+	}
+
+	support := make([]string, 0, len(dc))
+	oppose := make([]string, 0, len(dc))
+	for _, v := range dc {
+		c := convertCommentFromDecred(v)
+		u, err := p.db.UserGetByPubKey(c.PublicKey)
+		if err != nil {
+			log.Errorf("getDCCSupportOpposition: UserGetByPubKey: "+
+				"token:%v commentID:%v pubKey:%v err:%v",
+				token, c.CommentID, c.PublicKey, err)
+		}
+		if c.Comment == sponsorString {
+			support = append(support, u.ID.String())
+		} else if c.Comment == opposeString {
+			oppose = append(support, u.ID.String())
+		}
+	}
+
+	return support, oppose, nil
 }
 
 /*
@@ -543,8 +576,16 @@ func (p *politeiawww) processSupportDCC(sd cms.SupportDCC, u *user.User) (*cms.S
 		return nil, err
 	}
 
+	// Check to make sure the user has not Supported or Opposed this DCC yet
+	if stringInSlice(dcc.SupportUserIDs, u.ID.String()) ||
+		stringInSlice(dcc.OppositionUserIDs, u.ID.String()) {
+		return nil, www.UserError{
+			ErrorCode: www.ErrorStatusUserActionNotAllowed,
+		}
+	}
+
 	// Check to make sure the user is not the author of the DCC.
-	if dcc.SponsorUsername != u.Username {
+	if dcc.SponsorUserID == u.ID.String() {
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusUserActionNotAllowed,
 		}
@@ -643,8 +684,16 @@ func (p *politeiawww) processOpposeDCC(od cms.OpposeDCC, u *user.User) (*cms.Opp
 		return nil, err
 	}
 
+	// Check to make sure the user has not Supported or Opposed this DCC yet
+	if stringInSlice(dcc.SupportUserIDs, u.ID.String()) ||
+		stringInSlice(dcc.OppositionUserIDs, u.ID.String()) {
+		return nil, www.UserError{
+			ErrorCode: www.ErrorStatusUserActionNotAllowed,
+		}
+	}
+
 	// Check to make sure the user is not the author of the DCC.
-	if dcc.SponsorUsername != u.Username {
+	if dcc.SponsorUserID == u.ID.String() {
 		return nil, www.UserError{
 			ErrorCode: www.ErrorStatusUserActionNotAllowed,
 		}
@@ -950,4 +999,14 @@ func (p *politeiawww) processRejectDCC(rd cms.RejectDCC, u *user.User) (*cms.Rej
 	// Do full userdb update and reject user creds
 
 	return &cms.RejectDCCReply{}, nil
+}
+
+func stringInSlice(arr []string, str string) bool {
+	for _, s := range arr {
+		if str == s {
+			return true
+		}
+	}
+
+	return false
 }
