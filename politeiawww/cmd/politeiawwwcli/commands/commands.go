@@ -89,6 +89,7 @@ type Cmds struct {
 	NewComment          NewCommentCmd          `command:"newcomment" description:"(user)   create a new proposal comment"`
 	NewUser             NewUserCmd             `command:"newuser" description:"(public) create a new user"`
 	NewDCCUser          NewDCCUserCmd          `command:"newdccuser" description:"(user) create a new dcc user"`
+	OpposeDCC           OpposeDCCCmd           `command:"opposedcc" description:"(user) oppose a given DCC"`
 	PayInvoices         PayInvoicesCmd         `command:"payinvoices" description:"(admin) set all approved invoices to paid"`
 	Policy              PolicyCmd              `command:"policy" description:"(public) get the server policy"`
 	ProposalComments    ProposalCommentsCmd    `command:"proposalcomments" description:"(public) get the comments for a proposal"`
@@ -107,6 +108,7 @@ type Cmds struct {
 	SetProposalStatus   SetProposalStatusCmd   `command:"setproposalstatus" description:"(admin)  set the status of a proposal"`
 	StartVote           StartVoteCmd           `command:"startvote" description:"(admin)  start the voting period on a proposal"`
 	Subscribe           SubscribeCmd           `command:"subscribe" description:"(public) subscribe to all websocket commands and do not exit tool"`
+	SupportDCC          SupportDCCCmd          `command:"supportdcc" description:"(user) support a given DCC"`
 	Tally               TallyCmd               `command:"tally" description:"(public) get the vote tally for a proposal"`
 	TestRun             TestRunCmd             `command:"testrun" description:"         run a series of tests on the politeiawww routes (dev use only)"`
 	TokenInventory      TokenInventoryCmd      `command:"tokeninventory" description:"(public) get the censorship record tokens of all proposals"`

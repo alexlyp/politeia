@@ -1798,6 +1798,54 @@ func (c *Client) NewDCCUser(ndu cms.NewDCCUser) (*cms.NewDCCUserReply, error) {
 	return &ndur, nil
 }
 
+// SupportDCC issues support for a given DCC proposal.
+func (c *Client) SupportDCC(sd cms.SupportDCC) (*cms.SupportDCCReply, error) {
+	responseBody, err := c.makeRequest("POST", cms.RouteSupportDCC,
+		sd)
+	if err != nil {
+		return nil, err
+	}
+
+	var sdr cms.SupportDCCReply
+	err = json.Unmarshal(responseBody, &sdr)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal SupportDCCReply: %v", err)
+	}
+
+	if c.cfg.Verbose {
+		err := prettyPrintJSON(sdr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &sdr, nil
+}
+
+// OpposeDCC issues an opposition for a given DCC proposal.
+func (c *Client) OpposeDCC(sd cms.OpposeDCC) (*cms.OpposeDCCReply, error) {
+	responseBody, err := c.makeRequest("POST", cms.RouteOpposeDCC,
+		sd)
+	if err != nil {
+		return nil, err
+	}
+
+	var sdr cms.OpposeDCCReply
+	err = json.Unmarshal(responseBody, &sdr)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal OpposeDCCReply: %v", err)
+	}
+
+	if c.cfg.Verbose {
+		err := prettyPrintJSON(sdr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &sdr, nil
+}
+
 // Close all client connections.
 func (c *Client) Close() {
 	if c.conn != nil {
