@@ -38,11 +38,13 @@ const (
 	mdStreamDCCGeneral           = 5 // General DCC metadata
 	mdStreamDCCStatusChanges     = 6 // DCC status changes
 	mdStreamDCCSupportOpposition = 7 // DCC support/opposition changes
+	mdStreamDCCContractorVote    = 8 // DCC support/opposition changes
 
 	// Metadata stream struct versions
 	backendDCCMetadataVersion                  = 1
 	backendDCCStatusChangeVersion              = 1
 	backendDCCSupposeOppositionMetadataVersion = 1
+	backendDCCContractorVoteMetadataVersion    = 1
 
 	supportString = "aye"
 	opposeString  = "nay"
@@ -434,6 +436,28 @@ type backendDCCSupportOppositionMetadata struct {
 	Signature string `json:"signature"` // Signature of Token + Vote
 }
 
+// backendDCCContractorVoteMetadata represents the individual contractor votes
+// that will be appended to the particular DCC proposal in the event of
+// a debated DCC.
+type backendDCCStartContractorVoteMetadata struct {
+	Version     uint64           `json:"version"`     // Version of the struct
+	Timestamp   int64            `json:"timestamp"`   // Last update of invoice
+	PublicKey   string           `json:"publickey"`   // Key used for signature
+	UserWeights map[string]int64 `json:"userweights"` // ContractorVotingWeights
+	Signature   string           `json:"signature"`   // Signature of Token + Vote + Weight
+}
+
+// backendDCCContractorVoteMetadata represents the individual contractor votes
+// that will be appended to the particular DCC proposal in the event of
+// a debated DCC.
+type backendDCCContractorVoteMetadata struct {
+	Version   uint64 `json:"version"`   // Version of the struct
+	Timestamp int64  `json:"timestamp"` // Last update of invoice
+	PublicKey string `json:"publickey"` // Key used for signature
+	Vote      string `json:"vote"`      // Vote for support/opposition
+	Signature string `json:"signature"` // Signature of Token + Vote + Weight
+}
+
 // encodeBackendDCCMetadata encodes a backendDCCMetadata into a JSON
 // byte slice.
 func encodeBackendDCCMetadata(md backendDCCMetadata) ([]byte, error) {
@@ -509,6 +533,38 @@ func decodeBackendDCCSupportOppositionMetadata(payload []byte) ([]backendDCCSupp
 	d := json.NewDecoder(strings.NewReader(string(payload)))
 	for {
 		var m backendDCCSupportOppositionMetadata
+		err := d.Decode(&m)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		md = append(md, m)
+	}
+
+	return md, nil
+}
+
+// encodeBackendDCCContractorVoteMetadata encodes a backendDCCContractorVoteMetadata into a JSON
+// byte slice.
+func encodeBackendDCCContractorVoteMetadata(md backendDCCContractorVoteMetadata) ([]byte, error) {
+	b, err := json.Marshal(md)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// decodeBackendDCCContractorVoteMetadata decodes a JSON byte slice into a
+// backendDCCContractorVoteMetadata.
+func decodeBackendDCCContractorVoteMetadata(payload []byte) ([]backendDCCContractorVoteMetadata, error) {
+	var md []backendDCCContractorVoteMetadata
+
+	d := json.NewDecoder(strings.NewReader(string(payload)))
+	for {
+		var m backendDCCContractorVoteMetadata
 		err := d.Decode(&m)
 		if err == io.EOF {
 			break
@@ -1091,7 +1147,7 @@ func (p *politeiawww) processDebateDCC(ad cms.DebateDCC, u *user.User) (*cms.Deb
 
 	// Create the change record.
 	c := backendDCCStatusChange{
-		Version:        backendInvoiceStatusChangeVersion,
+		Version:        backendDCCStatusChangeVersion,
 		AdminPublicKey: u.PublicKey(),
 		Timestamp:      time.Now().Unix(),
 		NewStatus:      cms.DCCStatusDebate,
