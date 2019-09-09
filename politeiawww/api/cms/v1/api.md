@@ -1275,6 +1275,47 @@ Reply:
 {}
 ```
 
+### `Debate DCC`
+
+Debates a DCC proposal and starts a full contractor vote as to whether it 
+should be approved or rejected.
+
+Note: This call requires admin privileges.
+
+**Route:** `POST /v1/admin/debatedcc`
+
+**Params:**
+
+| Parameter | Type | Description | Required |
+|-|-|-|-|
+| reason | string | The reason for debating the DCC. | Yes |
+| token | string | The token of the DCC to debate. | Yes |
+| publickey | string | The user's public key. | Yes |
+| signature | string | The signature of the string representation of the reason and token payload. | Yes |
+
+**Results:**
+
+| | Type | Description |
+|-|-|-|
+
+**Example**
+
+Request:
+
+```json
+{
+  "reason":"nay",
+  "token":"5203ab0bb739f3fc267ad20c945b81bcb68ff22414510c000305f4f0afb90d1b",
+  "publickey":"5203ab0bb739f3fc267ad20c945b81bcb68ff22414510c000305f4f0afb90d1b",
+  "signature": "gdd92f26c8g38c90d2887259e88df614654g32fde76bef1438b0efg40e360f461e995d796g16b17108gbe226793ge4g52gg013428feb3c39de504fe5g1811e0e"}
+```
+
+Reply:
+
+```json
+{}
+```
+
 ### Error codes
 
 | Status | Value | Description |
