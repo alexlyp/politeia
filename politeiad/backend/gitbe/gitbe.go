@@ -27,6 +27,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	v1 "github.com/decred/dcrtime/api/v1"
 	"github.com/decred/dcrtime/merkle"
+	"github.com/decred/politeia/cmsplugin"
 	"github.com/decred/politeia/decredplugin"
 	pd "github.com/decred/politeia/politeiad/api/v1"
 	"github.com/decred/politeia/politeiad/api/v1/identity"
@@ -2512,6 +2513,12 @@ func (g *gitBackEnd) Plugin(command, payload string) (string, string, error) {
 	case decredplugin.CmdLoadVoteResults:
 		payload, err := g.pluginLoadVoteResults()
 		return decredplugin.CmdLoadVoteResults, payload, err
+	case cmsplugin.CmdStartVote:
+		payload, err := g.pluginStartDCCVote(payload)
+		return cmsplugin.CmdStartVote, payload, err
+	case cmsplugin.CmdCastVote:
+		payload, err := g.pluginCastVote(payload)
+		return cmsplugin.CmdCastVote, payload, err
 	}
 	return "", "", fmt.Errorf("invalid payload command") // XXX this needs to become a type error
 }
@@ -2655,7 +2662,8 @@ func (g *gitBackEnd) rebasePR(id string) error {
 }
 
 // New returns a gitBackEnd context.  It verifies that git is installed.
-func New(anp *chaincfg.Params, root string, dcrtimeHost string, gitPath string, id *identity.FullIdentity, gitTrace bool, dcrdataHost string) (*gitBackEnd, error) {
+func New(anp *chaincfg.Params, root string, dcrtimeHost string, gitPath string, id *identity.FullIdentity, gitTrace bool, dcrdataHost string, cmsMode bool) (*gitBackEnd, error) {
+
 	// Default to system git
 	if gitPath == "" {
 		gitPath = "git"
@@ -2676,10 +2684,20 @@ func New(anp *chaincfg.Params, root string, dcrtimeHost string, gitPath string, 
 		testAnchors:     make(map[string]bool),
 		plugins:         []backend.Plugin{getDecredPlugin(dcrdataHost)},
 	}
+
 	idJSON, err := id.Marshal()
 	if err != nil {
 		return nil, err
 	}
+	if !cmsMode {
+		g.plugins = []backend.Plugin{getDecredPlugin(dcrdataHost)}
+	} else {
+		g.plugins = []backend.Plugin{getDecredPlugin(dcrdataHost), getCMSPlugin(anp.Name != "mainnet")}
+
+		setCMSPluginSetting(cmsPluginIdentity, string(idJSON))
+		setCMSPluginSetting(cmsPluginJournals, g.journals)
+	}
+
 	setDecredPluginSetting(decredPluginIdentity, string(idJSON))
 	setDecredPluginSetting(decredPluginJournals, g.journals)
 	setDecredPluginHook(PluginPostHookEdit, g.decredPluginPostEdit)
@@ -2700,6 +2718,14 @@ func New(anp *chaincfg.Params, root string, dcrtimeHost string, gitPath string, 
 		return nil, err
 	}
 
+	if cmsMode {
+		// this function must be called after g.journal is created
+		err = g.initCMSPluginJournals()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	err = g.newLocked()
 	if err != nil {
 		return nil, err
@@ -2716,6 +2742,10 @@ func New(anp *chaincfg.Params, root string, dcrtimeHost string, gitPath string, 
 	err = g.cron.AddFunc(anchorSchedule, func() {
 		// Flush journals
 		g.decredPluginJournalFlusher()
+
+		if cmsMode {
+			g.cmsPluginJournalFlusher()
+		}
 
 		// Anchor commit
 		g.anchorAllReposCronJob()

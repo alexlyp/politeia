@@ -1000,7 +1000,7 @@ func (p *politeia) pluginCommand(w http.ResponseWriter, r *http.Request) {
 
 	// Send plugin command to cache
 	_, err = p.cache.PluginExec(cache.PluginCommand{
-		ID:             decredplugin.ID,
+		ID:             pc.ID,
 		Command:        pc.Command,
 		CommandPayload: pc.Payload,
 		ReplyPayload:   payload,
@@ -1150,12 +1150,11 @@ func _main() error {
 			return fmt.Errorf("unable to load cert")
 		}
 	}
-
 	// Setup backend.
 	gitbe.UseLogger(gitbeLog)
 	b, err := gitbe.New(activeNetParams.Params, loadedCfg.DataDir,
 		loadedCfg.DcrtimeHost, "", p.identity, loadedCfg.GitTrace,
-		loadedCfg.DcrdataHost)
+		loadedCfg.DcrdataHost, loadedCfg.Mode == "cmswww")
 	if err != nil {
 		return err
 	}

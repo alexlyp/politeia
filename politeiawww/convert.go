@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/politeia/cmsplugin"
 	"github.com/decred/politeia/decredplugin"
 	"github.com/decred/politeia/mdstream"
 	pd "github.com/decred/politeia/politeiad/api/v1"
@@ -820,6 +821,7 @@ func convertDatabaseInvoiceToInvoiceRecord(dbInvoice cmsdatabase.Invoice) *cms.I
 			Labor:         dbLineItem.Labor,
 			Expenses:      dbLineItem.Expenses,
 			SubRate:       dbLineItem.ContractorRate,
+			SubUserID:     dbLineItem.SubUserID,
 		}
 		invInputLineItems = append(invInputLineItems, lineItem)
 	}
@@ -867,6 +869,7 @@ func convertInvoiceRecordToDatabaseInvoice(invRec *cms.InvoiceRecord) *cmsdataba
 			Labor:          lineItem.Labor,
 			Expenses:       lineItem.Expenses,
 			ContractorRate: lineItem.SubRate,
+			SubUserID:      lineItem.SubUserID,
 		}
 		dbInvoice.LineItems = append(dbInvoice.LineItems, dbLineItem)
 	}
@@ -1621,4 +1624,38 @@ func convertDatabaseInvoiceToProposalLineItems(inv *cmsdatabase.Invoice) cms.Pro
 			SubRate:       inv.LineItems[0].ContractorRate,
 		},
 	}
+}
+
+func convertCastVoteFromCMS(b cms.VoteDCC) cmsplugin.CastVote {
+	return cmsplugin.CastVote{
+		Token:     b.Token,
+		UserID:    b.UserID,
+		Signature: b.Signature,
+	}
+}
+
+func convertUserWeightToCMS(uw []cmsplugin.UserWeight) []cms.DCCWeight {
+	dccWeight := make([]cms.DCCWeight, 0, len(uw))
+	for _, w := range uw {
+		dccWeight = append(dccWeight, cms.DCCWeight{
+			UserID: w.UserID,
+			Weight: w.Weight,
+		})
+	}
+	return dccWeight
+}
+
+func convertVoteOptionResultsToCMS(vr []cmsplugin.VoteOptionResult) []cms.VoteOptionResult {
+	votes := make([]cms.VoteOptionResult, 0, len(vr))
+	for _, w := range vr {
+		votes = append(votes, cms.VoteOptionResult{
+			Option: cms.VoteOption{
+				ID:          w.ID,
+				Description: w.Description,
+				Bits:        w.Bits,
+			},
+			VotesReceived: w.Votes,
+		})
+	}
+	return votes
 }
