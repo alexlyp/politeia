@@ -74,6 +74,7 @@ type Cmds struct {
 	CMSEditUser         CMSEditUserCmd         `command:"cmsedituser" description:"(user) edit current cms user information"`
 	DCCDetails          DCCDetailsCmd          `command:"dccdetails" description:"(user) get the details of a dcc"`
 	DCCComments         DCCCommentsCmd         `command:"dcccomments" description:"(user) get the comments for a dcc proposal"`
+	DebateDCC           DebateDCCCmd           `command:"debatedcc" description:"(admin) debate a given DCC"`
 	GetDCCs             GetDCCsCmd             `command:"getdccs" description:"(user) get all dccs (optional by status)"`
 	EditInvoice         EditInvoiceCmd         `command:"editinvoice" description:"(user)    edit a invoice"`
 	EditProposal        EditProposalCmd        `command:"editproposal" description:"(user)   edit a proposal"`

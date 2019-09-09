@@ -31,6 +31,7 @@ const (
 	RouteNewCommentDCC       = "/dcc/newcomment"
 	RouteDCCComments         = "/dcc/{token:[A-z0-9]{64}}/comments"
 	RouteSetDCCStatus        = "/dcc/{token:[A-z0-9]{64}}/status"
+	RouteDebateDCC           = "/admin/debatedcc"
 	RouteAdminInvoices       = "/admin/invoices"
 	RouteAdminUserInvoices   = "/admin/userinvoices"
 	RouteGeneratePayouts     = "/admin/generatepayouts"
@@ -87,6 +88,7 @@ const (
 	DCCStatusActive   DCCStatusT = 1 // Currently active issuance/revocation (awaiting sponsors)
 	DCCStatusApproved DCCStatusT = 2 // Fully approved DCC proposal
 	DCCStatusRejected DCCStatusT = 3 // Rejected DCC proposal
+	DCCStatusDebate   DCCStatusT = 4 // Debated DCC proposal (full contractor vote)
 
 	InvoiceInputVersion = 1
 
@@ -668,3 +670,17 @@ type SetDCCStatus struct {
 
 // SetDCCStatusReply returns an empty response when successful.
 type SetDCCStatusReply struct{}
+
+// DebateDCC is an admin request that updates the status of a given
+// DCC into a debated state.  This will allow it to start to accept user
+// votes that will be tabulated and decide whether to approval or reject
+// a DCC proposal.
+type DebateDCC struct {
+	Token     string `json:"token"`     // Token of the DCC iss/rev
+	Reason    string `json:"comment"`   // Reason for debate
+	Signature string `json:"signature"` // Client Signature of Token+Reason
+	PublicKey string `json:"publickey"` // Pubkey used for Signature
+}
+
+// DebateDCCReply returns an empty response when successful.
+type DebateDCCReply struct{}

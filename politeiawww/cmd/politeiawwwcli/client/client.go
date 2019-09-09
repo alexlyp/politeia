@@ -1893,6 +1893,30 @@ func (c *Client) SetDCCStatus(sd *cms.SetDCCStatus) (*cms.SetDCCStatusReply, err
 	return &sdr, nil
 }
 
+// DebateDCC issues an admin approval for a given DCC proposal.
+func (c *Client) DebateDCC(dd cms.DebateDCC) (*cms.DebateDCCReply, error) {
+	responseBody, err := c.makeRequest("POST", cms.RouteDebateDCC,
+		dd)
+	if err != nil {
+		return nil, err
+	}
+
+	var ddr cms.DebateDCCReply
+	err = json.Unmarshal(responseBody, &ddr)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal DebateDCCReply: %v", err)
+	}
+
+	if c.cfg.Verbose {
+		err := prettyPrintJSON(ddr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &ddr, nil
+}
+
 // Close all client connections.
 func (c *Client) Close() {
 	if c.conn != nil {

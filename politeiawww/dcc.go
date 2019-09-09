@@ -58,11 +58,14 @@ var (
 	}
 
 	// This covers the possible valid status transitions for any dcc.
-	// Currentyly, this only applies to active DCC's.  In the future there will
-	// be more options with the addition of Debated DCC's.
 	validDCCStatusTransitions = map[cms.DCCStatusT][]cms.DCCStatusT{
 		// Active DCC's may only be approved or rejected.
 		cms.DCCStatusActive: {
+			cms.DCCStatusApproved,
+			cms.DCCStatusRejected,
+			cms.DCCStatusDebate,
+		},
+		cms.DCCStatusDebate: {
 			cms.DCCStatusApproved,
 			cms.DCCStatusRejected,
 		},
@@ -1059,4 +1062,93 @@ func dccStatusInSlice(arr []cms.DCCStatusT, status cms.DCCStatusT) bool {
 	}
 
 	return false
+}
+
+func (p *politeiawww) processDebateDCC(ad cms.DebateDCC, u *user.User) (*cms.DebateDCCReply, error) {
+	log.Tracef("processDebateDCC: %v", u.PublicKey())
+
+	dcc, err := p.getDCC(ad.Token)
+	if err != nil {
+		if err == cache.ErrRecordNotFound {
+			err = www.UserError{
+				ErrorCode: cms.ErrorStatusInvoiceNotFound,
+			}
+		}
+		return nil, err
+	}
+
+	// Validate signature
+	msg := fmt.Sprintf("%v%v", ad.Token, ad.Reason)
+	err = validateSignature(ad.PublicKey, ad.Signature, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateDCCStatusTransition(dcc.Status, cms.DCCStatusDebate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the change record.
+	c := backendDCCStatusChange{
+		Version:        backendInvoiceStatusChangeVersion,
+		AdminPublicKey: u.PublicKey(),
+		Timestamp:      time.Now().Unix(),
+		NewStatus:      cms.DCCStatusDebate,
+		Reason:         ad.Reason,
+		Signature:      ad.Signature,
+	}
+	blob, err := encodeBackendDCCStatusChange(c)
+	if err != nil {
+		return nil, err
+	}
+
+	challenge, err := util.Random(pd.ChallengeSize)
+	if err != nil {
+		return nil, err
+	}
+
+	pdCommand := pd.UpdateVettedMetadata{
+		Challenge: hex.EncodeToString(challenge),
+		Token:     ad.Token,
+		MDAppend: []pd.MetadataStream{
+			{
+				ID:      mdStreamDCCStatusChanges,
+				Payload: string(blob),
+			},
+		},
+	}
+
+	responseBody, err := p.makeRequest(http.MethodPost, pd.UpdateVettedMetadataRoute, pdCommand)
+	if err != nil {
+		return nil, err
+	}
+
+	var pdReply pd.UpdateVettedMetadataReply
+	err = json.Unmarshal(responseBody, &pdReply)
+	if err != nil {
+		return nil, fmt.Errorf("Could not unmarshal UpdateVettedMetadataReply: %v",
+			err)
+	}
+
+	// Verify the UpdateVettedMetadata challenge.
+	err = util.VerifyChallenge(p.cfg.Identity, challenge, pdReply.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	dbDCC, err := p.cmsDB.DCCByToken(ad.Token)
+	if err != nil {
+		return nil, err
+	}
+	dbDCC.Status = cms.DCCStatusDebate
+	dbDCC.StatusChangeReason = ad.Reason
+
+	// Update cmsdb
+	err = p.cmsDB.UpdateDCC(dbDCC)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cms.DebateDCCReply{}, nil
 }

@@ -721,6 +721,35 @@ func (p *politeiawww) handleSetDCCStatus(w http.ResponseWriter, r *http.Request)
 	util.RespondWithJSON(w, http.StatusOK, adr)
 }
 
+func (p *politeiawww) handleDebateDCC(w http.ResponseWriter, r *http.Request) {
+	log.Tracef("handleDebateDCC")
+
+	var dd cms.DebateDCC
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&dd); err != nil {
+		RespondWithError(w, r, 0, "handleDebateDCC: unmarshal",
+			www.UserError{
+				ErrorCode: www.ErrorStatusInvalidInput,
+			})
+		return
+	}
+	u, err := p.getSessionUser(w, r)
+	if err != nil {
+		RespondWithError(w, r, 0,
+			"handleDebateDCC: getSessionUser %v", err)
+		return
+	}
+
+	ddr, err := p.processDebateDCC(dd, u)
+	if err != nil {
+		RespondWithError(w, r, 0,
+			"handleDebateDCC: processDebateDCC: %v", err)
+		return
+	}
+
+	util.RespondWithJSON(w, http.StatusOK, ddr)
+}
+
 func (p *politeiawww) setCMSWWWRoutes() {
 	// Templates
 	//p.addTemplate(templateNewProposalSubmittedName,
@@ -796,4 +825,6 @@ func (p *politeiawww) setCMSWWWRoutes() {
 		p.handleAdminUserInvoices, permissionAdmin)
 	p.addRoute(http.MethodPost, cms.RouteSetDCCStatus,
 		p.handleSetDCCStatus, permissionAdmin)
+	p.addRoute(http.MethodPost, cms.RouteDebateDCC,
+		p.handleDebateDCC, permissionAdmin)
 }
