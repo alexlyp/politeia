@@ -437,6 +437,60 @@ func (p *politeiawww) getCMSUserByID(id string) (*cms.User, error) {
 
 }
 
+func (p *politeiawww) getCMSUserWeights() (map[string]int64, error) {
+	userWeights := make(map[string]int64, 1080)
+
+	weightMonths := 6
+
+	/// XXX come up with a better acceptable invoice month/year algo
+	weightEnd := time.Now()
+	weightMonthEnd := uint(weightEnd.Month())
+	weightYearEnd := uint(weightEnd.Year())
+
+	weightStart := time.Now().Add(-1 * 24 * (weightMonths * 30) * time.Hour) // 6 months back?
+	weightMonthStart := uint(time.Now().Month())
+	weightYearStart := uint(time.Now().Year())
+
+	err := p.db.AllUsers(func(user *user.User) {
+		cmsUser, err := p.getCMSUserByID(user.ID.String())
+		if err != nil {
+			log.Errorf("getCMSUserWeights: getCMSUserByID %v", err)
+			return
+		}
+
+		if cmsUser.ContractorType != cms.ContractorTypeDirect &&
+			cmsUser.ContractorType != cms.ContractorTypeSubContractor &&
+			cmsUser.ContractorType != cms.ContractorTypeSupervisor {
+			return
+		}
+
+		// Calculate weight here
+		weight := int64(0)
+		userInvoices, err := p.cmsDB.InvoicesByUserID(cmsUser.ID)
+		if err != nil {
+			log.Errorf("getCMSUserWeights: InvoicesByUserID %v", err)
+			return
+		}
+		billedMinutes := uint(0)
+		for _, i := range userInvoices {
+			if i.Month <= weightMonthEnd && i.Month >= weightMonthStart &&
+				i.Year <= weightYearEnd && i.Month >= weightYearStart {
+				// now look at the lineitems within that invoice and tabulate billed hours
+				for _, li := range i.LineItems {
+					billedMinutes += li.Labor / 60
+				}
+			}
+		}
+		userWeights[cmsUser.ID] = weight
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return userWeights, nil
+
+}
+
 // convertCMSUserFromDatabaseUser converts a user User to a cms User.
 func convertCMSUserFromDatabaseUser(user *user.CMSUser) cms.User {
 	return cms.User{

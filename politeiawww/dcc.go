@@ -35,19 +35,24 @@ const (
 	dccFile = "dcc.json"
 
 	// politeiad dcc record metadata streams
-	mdStreamDCCGeneral           = 5 // General DCC metadata
-	mdStreamDCCStatusChanges     = 6 // DCC status changes
-	mdStreamDCCSupportOpposition = 7 // DCC support/opposition changes
-	mdStreamDCCContractorVote    = 8 // DCC support/opposition changes
+	mdStreamDCCGeneral             = 5 // General DCC metadata
+	mdStreamDCCStatusChanges       = 6 // DCC status changes
+	mdStreamDCCSupportOpposition   = 7 // DCC support/opposition changes
+	mdStreamDCCStartContractorVote = 8 // DCC start contractor vote
+	mdStreamDCCContractorVote      = 9 // DCC contractor votes
 
 	// Metadata stream struct versions
 	backendDCCMetadataVersion                  = 1
 	backendDCCStatusChangeVersion              = 1
 	backendDCCSupposeOppositionMetadataVersion = 1
 	backendDCCContractorVoteMetadataVersion    = 1
+	backendDCCStartContractorVoteVersion       = 1
 
 	supportString = "aye"
 	opposeString  = "nay"
+
+	// DCC Contractor Vote duration
+	dccVoteDuration = 24 * 7 * time.Hour // 1 Week
 )
 
 var (
@@ -436,15 +441,16 @@ type backendDCCSupportOppositionMetadata struct {
 	Signature string `json:"signature"` // Signature of Token + Vote
 }
 
-// backendDCCContractorVoteMetadata represents the individual contractor votes
-// that will be appended to the particular DCC proposal in the event of
-// a debated DCC.
+// backendDCCStartContractorVoteMetadata contains information about the full
+// contractor vote that will be done to decide the fate of a given DCC.
 type backendDCCStartContractorVoteMetadata struct {
-	Version     uint64           `json:"version"`     // Version of the struct
-	Timestamp   int64            `json:"timestamp"`   // Last update of invoice
-	PublicKey   string           `json:"publickey"`   // Key used for signature
-	UserWeights map[string]int64 `json:"userweights"` // ContractorVotingWeights
-	Signature   string           `json:"signature"`   // Signature of Token + Vote + Weight
+	Version        uint64           `json:"version"`     // Version of the struct
+	Timestamp      int64            `json:"timestamp"`   // Last update of invoice
+	AdminPublicKey string           `json:"publickey"`   // Key used for signature
+	StartTime      int64            `json:"starttime"`   // Time that the vote started
+	StopTime       int64            `json:"stoptime"`    // Time that the vote is stopping
+	UserWeights    map[string]int64 `json:"userweights"` // Contractor Voting Weights
+	Signature      string           `json:"signature"`   // Signature of Token + Vote + Weight
 }
 
 // backendDCCContractorVoteMetadata represents the individual contractor votes
@@ -455,6 +461,7 @@ type backendDCCContractorVoteMetadata struct {
 	Timestamp int64  `json:"timestamp"` // Last update of invoice
 	PublicKey string `json:"publickey"` // Key used for signature
 	Vote      string `json:"vote"`      // Vote for support/opposition
+	Weight    int64  `json:"weight"`    // Weight of the contractor's vote
 	Signature string `json:"signature"` // Signature of Token + Vote + Weight
 }
 
@@ -533,6 +540,38 @@ func decodeBackendDCCSupportOppositionMetadata(payload []byte) ([]backendDCCSupp
 	d := json.NewDecoder(strings.NewReader(string(payload)))
 	for {
 		var m backendDCCSupportOppositionMetadata
+		err := d.Decode(&m)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		md = append(md, m)
+	}
+
+	return md, nil
+}
+
+// encodeBackendDCCStartContractorVoteMetadata encodes a backendDCCStartContractorVoteMetadata into a JSON
+// byte slice.
+func encodeBackendDCCStartContractorVoteMetadata(md backendDCCStartContractorVoteMetadata) ([]byte, error) {
+	b, err := json.Marshal(md)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// decodeBackendDCCStartContractorVoteMetadata decodes a JSON byte slice into a
+// backendDCCStartContractorVoteMetadata.
+func decodeBackendDCCStartContractorVoteMetadata(payload []byte) ([]backendDCCStartContractorVoteMetadata, error) {
+	var md []backendDCCStartContractorVoteMetadata
+
+	d := json.NewDecoder(strings.NewReader(string(payload)))
+	for {
+		var m backendDCCStartContractorVoteMetadata
 		err := d.Decode(&m)
 		if err == io.EOF {
 			break
@@ -1134,7 +1173,7 @@ func (p *politeiawww) processDebateDCC(ad cms.DebateDCC, u *user.User) (*cms.Deb
 	}
 
 	// Validate signature
-	msg := fmt.Sprintf("%v%v", ad.Token, ad.Reason)
+	msg := fmt.Sprintf("%v%v%v", ad.Token, int(cms.DCCStatusDebate), ad.Reason)
 	err = validateSignature(ad.PublicKey, ad.Signature, msg)
 	if err != nil {
 		return nil, err
@@ -1181,6 +1220,61 @@ func (p *politeiawww) processDebateDCC(ad cms.DebateDCC, u *user.User) (*cms.Deb
 	}
 
 	var pdReply pd.UpdateVettedMetadataReply
+	err = json.Unmarshal(responseBody, &pdReply)
+	if err != nil {
+		return nil, fmt.Errorf("Could not unmarshal UpdateVettedMetadataReply: %v",
+			err)
+	}
+
+	// Verify the UpdateVettedMetadata challenge.
+	err = util.VerifyChallenge(p.cfg.Identity, challenge, pdReply.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	userWeights, err := p.getCMSUserWeights()
+	if err != nil {
+		return nil, err
+	}
+
+	startTime := time.Now().Unix()
+	stopTime := time.Now().Add(dccVoteDuration).Unix()
+	// Create the start vote metadata record.
+	cc := backendDCCStartContractorVoteMetadata{
+		Version:        backendDCCStartContractorVoteVersion,
+		AdminPublicKey: u.PublicKey(),
+		Timestamp:      time.Now().Unix(),
+		StartTime:      startTime,
+		StopTime:       stopTime,
+		UserWeights:    userWeights,
+		//Signature:      ad.Signature,   XXX how to deal with this?
+	}
+	blob, err = encodeBackendDCCStartContractorVoteMetadata(cc)
+	if err != nil {
+		return nil, err
+	}
+
+	challenge, err = util.Random(pd.ChallengeSize)
+	if err != nil {
+		return nil, err
+	}
+
+	pdCommand = pd.UpdateVettedMetadata{
+		Challenge: hex.EncodeToString(challenge),
+		Token:     ad.Token,
+		MDAppend: []pd.MetadataStream{
+			{
+				ID:      mdStreamDCCStartContractorVote,
+				Payload: string(blob),
+			},
+		},
+	}
+
+	responseBody, err = p.makeRequest(http.MethodPost, pd.UpdateVettedMetadataRoute, pdCommand)
+	if err != nil {
+		return nil, err
+	}
+
 	err = json.Unmarshal(responseBody, &pdReply)
 	if err != nil {
 		return nil, fmt.Errorf("Could not unmarshal UpdateVettedMetadataReply: %v",
