@@ -1021,6 +1021,7 @@ func (p *politeiawww) processSetDCCStatus(sds cms.SetDCCStatus, u *user.User) (*
 			ErrorCode: www.ErrorStatusInvalidSigningKey,
 		}
 	}
+
 	// Validate signature
 	msg := fmt.Sprintf("%v%v%v", sds.Token, int(sds.Status), sds.Reason)
 	err := validateSignature(sds.PublicKey, sds.Signature, msg)
@@ -1168,7 +1169,7 @@ func (p *politeiawww) processDebateDCC(ad cms.DebateDCC, u *user.User) (*cms.Deb
 	if err != nil {
 		if err == cache.ErrRecordNotFound {
 			err = www.UserError{
-				ErrorCode: cms.ErrorStatusInvoiceNotFound,
+				ErrorCode: cms.ErrorStatusDCCNotFound,
 			}
 		}
 		return nil, err
@@ -1303,4 +1304,79 @@ func (p *politeiawww) processDebateDCC(ad cms.DebateDCC, u *user.User) (*cms.Deb
 	}
 
 	return &cms.DebateDCCReply{}, nil
+}
+
+func (p *politeiawww) processVoteDCC(vd cms.VoteDCC, u *user.User) (*cms.VoteDCCReply, error) {
+	log.Tracef("processVoteDCC: %v", u.PublicKey())
+
+	if vd.Vote != supportString && vd.Vote != opposeString {
+		return nil, www.UserError{
+			ErrorCode:    cms.ErrorStatusInvalidSupportOppose,
+			ErrorContext: []string{"vote string not aye or nay"},
+		}
+	}
+
+	dcc, err := p.getDCC(vd.Token)
+	if err != nil {
+		if err == cache.ErrRecordNotFound {
+			err = www.UserError{
+				ErrorCode: cms.ErrorStatusDCCNotFound,
+			}
+		}
+		return nil, err
+	}
+
+	if dcc.Status != cms.DCCStatusDebate {
+		return nil, www.UserError{
+			ErrorCode: cms.ErrorStatusInvalidDCCVoteStatus,
+		}
+	}
+	cc := backendDCCContractorVoteMetadata{
+		Version:   backendDCCStartContractorVoteVersion,
+		PublicKey: u.PublicKey(),
+		Timestamp: time.Now().Unix(),
+		Vote:      vd.Vote,
+		Weight:    int64(0),
+		Signature: vd.Signature,
+	}
+	blob, err := encodeBackendDCCContractorVoteMetadata(cc)
+	if err != nil {
+		return nil, err
+	}
+
+	challenge, err := util.Random(pd.ChallengeSize)
+	if err != nil {
+		return nil, err
+	}
+
+	pdCommand := pd.UpdateVettedMetadata{
+		Challenge: hex.EncodeToString(challenge),
+		Token:     vd.Token,
+		MDAppend: []pd.MetadataStream{
+			{
+				ID:      mdStreamDCCContractorVote,
+				Payload: string(blob),
+			},
+		},
+	}
+
+	responseBody, err := p.makeRequest(http.MethodPost, pd.UpdateVettedMetadataRoute, pdCommand)
+	if err != nil {
+		return nil, err
+	}
+
+	var pdReply pd.UpdateVettedMetadataReply
+	err = json.Unmarshal(responseBody, &pdReply)
+	if err != nil {
+		return nil, fmt.Errorf("Could not unmarshal UpdateVettedMetadataReply: %v",
+			err)
+	}
+
+	// Verify the UpdateVettedMetadata challenge.
+	err = util.VerifyChallenge(p.cfg.Identity, challenge, pdReply.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cms.VoteDCCReply{}, nil
 }

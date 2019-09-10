@@ -750,6 +750,35 @@ func (p *politeiawww) handleDebateDCC(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, ddr)
 }
 
+func (p *politeiawww) handleVoteDCC(w http.ResponseWriter, r *http.Request) {
+	log.Tracef("handleVoteDCC")
+
+	var vd cms.VoteDCC
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&vd); err != nil {
+		RespondWithError(w, r, 0, "handleVoteDCC: unmarshal",
+			www.UserError{
+				ErrorCode: www.ErrorStatusInvalidInput,
+			})
+		return
+	}
+	u, err := p.getSessionUser(w, r)
+	if err != nil {
+		RespondWithError(w, r, 0,
+			"handleVoteDCC: getSessionUser %v", err)
+		return
+	}
+
+	vdr, err := p.processVoteDCC(vd, u)
+	if err != nil {
+		RespondWithError(w, r, 0,
+			"handleVoteDCC: processVoteDCC: %v", err)
+		return
+	}
+
+	util.RespondWithJSON(w, http.StatusOK, vdr)
+}
+
 func (p *politeiawww) setCMSWWWRoutes() {
 	// Templates
 	//p.addTemplate(templateNewProposalSubmittedName,
@@ -798,6 +827,8 @@ func (p *politeiawww) setCMSWWWRoutes() {
 		p.handleNewCommentDCC, permissionLogin)
 	p.addRoute(http.MethodGet, cms.RouteDCCComments,
 		p.handleDCCComments, permissionLogin)
+	p.addRoute(http.MethodGet, cms.RouteVoteDCC,
+		p.handleVoteDCC, permissionLogin)
 
 	// Unauthenticated websocket
 	p.addRoute("", www.RouteUnauthenticatedWebSocket,

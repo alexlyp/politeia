@@ -31,6 +31,7 @@ const (
 	RouteNewCommentDCC       = "/dcc/newcomment"
 	RouteDCCComments         = "/dcc/{token:[A-z0-9]{64}}/comments"
 	RouteSetDCCStatus        = "/dcc/{token:[A-z0-9]{64}}/status"
+	RouteVoteDCC             = "/dcc/vote"
 	RouteDebateDCC           = "/admin/debatedcc"
 	RouteAdminInvoices       = "/admin/invoices"
 	RouteAdminUserInvoices   = "/admin/userinvoices"
@@ -199,6 +200,7 @@ const (
 	ErrorStatusUserIsAuthor                   www.ErrorStatusT = 1044
 	ErrorStatusInvalidUserDCC                 www.ErrorStatusT = 1045
 	ErrorStatusInvalidDCCContractorType       www.ErrorStatusT = 1046
+	ErrorStatusInvalidDCCVoteStatus           www.ErrorStatusT = 1047
 )
 
 var (
@@ -275,6 +277,7 @@ var (
 		ErrorStatusUserIsAuthor:                   "user cannot support or oppose their own sponsored DCC",
 		ErrorStatusInvalidUserDCC:                 "user is not authorized to complete the DCC request",
 		ErrorStatusInvalidDCCContractorType:       "DCC must have a valid contractor type",
+		ErrorStatusInvalidDCCVoteStatus:           "the DCC to be voted isn't currently up for debate",
 	}
 )
 
@@ -684,3 +687,14 @@ type DebateDCC struct {
 
 // DebateDCCReply returns an empty response when successful.
 type DebateDCCReply struct{}
+
+// VoteDCC is a authenticated user request that will vote on a debated DCC proposal.
+type VoteDCC struct {
+	Vote      string `json:"comment"`   // Vote must be "aye" or "nay"
+	Token     string `json:"token"`     // The censorship token of the given DCC issuance or revocation.
+	PublicKey string `json:"publickey"` // Pubkey of the submitting user
+	Signature string `json:"signature"` // Signature of the Token+Vote by the submitting user.
+}
+
+// VoteDCCReply returns an emptry response when successful.
+type VoteDCCReply struct{}
