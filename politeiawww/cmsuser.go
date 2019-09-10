@@ -440,16 +440,16 @@ func (p *politeiawww) getCMSUserByID(id string) (*cms.User, error) {
 func (p *politeiawww) getCMSUserWeights() (map[string]int64, error) {
 	userWeights := make(map[string]int64, 1080)
 
-	weightMonths := 6
+	//weightMonths := 6
 
 	/// XXX come up with a better acceptable invoice month/year algo
 	weightEnd := time.Now()
 	weightMonthEnd := uint(weightEnd.Month())
 	weightYearEnd := uint(weightEnd.Year())
 
-	weightStart := time.Now().Add(-1 * 24 * (weightMonths * 30) * time.Hour) // 6 months back?
-	weightMonthStart := uint(time.Now().Month())
-	weightYearStart := uint(time.Now().Year())
+	weightStart := time.Now().Add(-1 * 24 * 30 * 6 * time.Hour) // 6 months back?
+	weightMonthStart := uint(weightStart.Month())
+	weightYearStart := uint(weightStart.Year())
 
 	err := p.db.AllUsers(func(user *user.User) {
 		cmsUser, err := p.getCMSUserByID(user.ID.String())
@@ -465,7 +465,6 @@ func (p *politeiawww) getCMSUserWeights() (map[string]int64, error) {
 		}
 
 		// Calculate weight here
-		weight := int64(0)
 		userInvoices, err := p.cmsDB.InvoicesByUserID(cmsUser.ID)
 		if err != nil {
 			log.Errorf("getCMSUserWeights: InvoicesByUserID %v", err)
@@ -481,6 +480,9 @@ func (p *politeiawww) getCMSUserWeights() (map[string]int64, error) {
 				}
 			}
 		}
+
+		// Weight it according to an average monthly minutes (150)
+		weight := int64(float64(averageMonthlyMinutes) / float64(billedMinutes) * 100)
 		userWeights[cmsUser.ID] = weight
 	})
 	if err != nil {

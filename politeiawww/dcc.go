@@ -53,6 +53,8 @@ const (
 
 	// DCC Contractor Vote duration
 	dccVoteDuration = 24 * 7 * time.Hour // 1 Week
+
+	averageMonthlyMinutes = 140 * 60 // 140 Hours * 60 Minutes
 )
 
 var (
