@@ -1182,7 +1182,7 @@ func (p *politeiawww) processDebateDCC(ad cms.DebateDCC, u *user.User) (*cms.Deb
 		return nil, err
 	}
 
-	err = validateDCCStatusTransition(dcc.Status, cms.DCCStatusDebate)
+	err = validateDCCStatusTransition(dcc.Status, cms.DCCStatusDebate, ad.Reason)
 	if err != nil {
 		return nil, err
 	}
