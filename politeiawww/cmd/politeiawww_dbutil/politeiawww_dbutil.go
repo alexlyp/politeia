@@ -38,6 +38,7 @@ import (
 	"github.com/marcopeereboom/sbox"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -81,6 +82,7 @@ var (
 	stubUsers  = flag.Bool("stubusers", false, "")
 	migrate    = flag.Bool("migrate", false, "")
 	createKey  = flag.Bool("createkey", false, "")
+	cmsAdmin   = flag.Bool("cmsadmin", false, "")
 
 	network string // Mainnet or testnet3
 	// XXX ldb should be abstracted away. dbutil commands should use
@@ -147,6 +149,10 @@ const usageMsg = `politeiawww_dbutil usage:
           Migrate a LevelDB user database to CockroachDB
           Required DB flag : None
           Args             : None
+	-cmsadmin
+		  Creates an initial admin user for CMS.
+		  Required DB flag : -leveldb or -cockroachdb
+		  Args             : None
 `
 
 type proposalMetadata struct {
@@ -718,6 +724,85 @@ func cmdCreateKey() error {
 	return nil
 }
 
+func levelCreateAdmin() error {
+	return fmt.Errorf("only coachrock is currently supported for this command")
+}
+
+func cockroachCreateAdmin() error {
+	cdb, err := cockroachdb.New(*host, chaincfg.TestNet3Params.Name, *rootCert,
+		*clientCert, *clientKey, *encryptionKey)
+	if err != nil {
+		return fmt.Errorf("new cockroachdb: %v", err)
+	}
+	defer cdb.Close()
+
+	// Create user		return
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte("password"),
+		bcrypt.MinCost)
+	if err != nil {
+		return err
+	}
+	newUser := user.User{
+		Email:          "admin@testcms.org",
+		Username:       "admin1",
+		HashedPassword: hashedPass,
+		Admin:          true,
+	}
+	_, err = cdb.UserGetByUsername(newUser.Username)
+	switch err {
+	case nil:
+		for err != user.ErrUserNotFound {
+			// Username is a duplicate. Allow for the username to be
+			// updated here. The migration will fail if the username
+			// is not unique.
+			fmt.Printf("Username '%v' already exists. Username must be "+
+				"updated for the following user before the migration can "+
+				"continue.\n", newUser.Username)
+
+			fmt.Printf("Email              : %v\n", newUser.Email)
+			fmt.Printf("Username           : %v\n", newUser.Username)
+			fmt.Printf("Input new username : ")
+
+			var input string
+			r := bufio.NewReader(os.Stdin)
+			input, err = r.ReadString('\n')
+			if err != nil {
+				return err
+			}
+
+			username := strings.TrimSuffix(input, "\n")
+			newUser.Username = strings.ToLower(strings.TrimSpace(username))
+			_, err = cdb.UserGetByUsername(newUser.Username)
+		}
+
+		fmt.Printf("Username updated to '%v'\n", newUser.Username)
+
+	case user.ErrUserNotFound:
+		// Username doesn't exist; continue
+	default:
+		return err
+	}
+	// Save new user to the database
+	err = cdb.UserNew(newUser)
+	if err != nil {
+		return err
+	}
+	fmt.Println("sdfsadfsdf")
+	return nil
+}
+
+func cmdCreateAdmin() error {
+
+	switch {
+	case *level:
+		return levelCreateAdmin()
+	case *cockroach:
+		return cockroachCreateAdmin()
+	}
+
+	return nil
+}
+
 func validateCockroachParams() error {
 	// Validate host
 	_, err := url.Parse(*host)
@@ -845,6 +930,8 @@ func _main() error {
 		return cmdMigrate()
 	case *createKey:
 		return cmdCreateKey()
+	case *cmsAdmin:
+		return cmdCreateAdmin()
 	default:
 		flag.Usage()
 	}
