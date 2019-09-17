@@ -119,7 +119,7 @@ const usageMsg = `politeiawww_dbutil usage:
           (default ~/.cockroachdb/certs/clients/politeiawww/client.politeiawww.key)
     -encryptionkey string
           File containing the CockroachDB encryption key
-          (default osDataDir/politeiawww/sbox.key)
+		  (default osDataDir/politeiawww/sbox.key)		  
 
   Commands
     -addcredits
@@ -150,10 +150,10 @@ const usageMsg = `politeiawww_dbutil usage:
           Migrate a LevelDB user database to CockroachDB
           Required DB flag : None
           Args             : None
-	-cmsadmin
-		  Creates an initial admin user for CMS.
-		  Required DB flag : -leveldb or -cockroachdb
-		  Args             : None
+    -cmsadmin
+          Creates an initial admin user for CMS.
+          Required DB flag : -leveldb (not implemented) or -cockroachdb
+          CockroachDB args : <username> <email> <password>
 `
 
 type proposalMetadata struct {
@@ -736,7 +736,7 @@ func DigestSHA3(s string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func cockroachCreateAdmin() error {
+func cockroachCreateAdmin(username, email, password string) error {
 	cdb, err := cockroachdb.New(*host, chaincfg.TestNet3Params.Name, *rootCert,
 		*clientCert, *clientKey, *encryptionKey)
 	if err != nil {
@@ -744,14 +744,14 @@ func cockroachCreateAdmin() error {
 	}
 	defer cdb.Close()
 
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(DigestSHA3("password")),
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(DigestSHA3(password)),
 		bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	newUser := user.User{
-		Email:          "admin@cms.org",
-		Username:       "admin",
+		Email:          email,
+		Username:       username,
 		HashedPassword: hashedPass,
 		Admin:          true,
 	}
@@ -794,17 +794,21 @@ func cockroachCreateAdmin() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("sdfsadfsdf")
 	return nil
 }
 
 func cmdCreateAdmin() error {
+	args := flag.Args()
+	if len(args) < 3 {
+		flag.Usage()
+		return nil
+	}
 
 	switch {
 	case *level:
 		return levelCreateAdmin()
 	case *cockroach:
-		return cockroachCreateAdmin()
+		return cockroachCreateAdmin(args[0], args[1], args[2])
 	}
 
 	return nil
