@@ -39,6 +39,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -728,6 +729,13 @@ func levelCreateAdmin() error {
 	return fmt.Errorf("only coachrock is currently supported for this command")
 }
 
+// DigestSHA3 returns the hex encoded SHA3-256 of a string.
+func DigestSHA3(s string) string {
+	h := sha3.New256()
+	h.Write([]byte(s))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func cockroachCreateAdmin() error {
 	cdb, err := cockroachdb.New(*host, chaincfg.TestNet3Params.Name, *rootCert,
 		*clientCert, *clientKey, *encryptionKey)
@@ -736,15 +744,14 @@ func cockroachCreateAdmin() error {
 	}
 	defer cdb.Close()
 
-	// Create user		return
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte("password"),
-		bcrypt.MinCost)
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(DigestSHA3("password")),
+		bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	newUser := user.User{
-		Email:          "admin@testcms.org",
-		Username:       "admin1",
+		Email:          "admin@cms.org",
+		Username:       "admin",
 		HashedPassword: hashedPass,
 		Admin:          true,
 	}
