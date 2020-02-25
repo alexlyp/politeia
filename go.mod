@@ -27,7 +27,10 @@ require (
 	github.com/decred/dcrdata/semver v1.0.0
 	github.com/decred/dcrtime v0.0.0-20191018193024-8d8b4ef0458e
 	github.com/decred/dcrwallet v1.2.3-0.20190128160919-849f7c01c12d
+	github.com/decred/dcrwallet/errors/v2 v2.0.0
+	github.com/decred/dcrwallet/rpc/client/dcrd v1.0.0
 	github.com/decred/dcrwallet/rpc/walletrpc v0.2.0
+	github.com/decred/dcrwallet/wallet/v3 v3.2.1
 	github.com/decred/go-socks v1.1.0
 	github.com/decred/slog v1.0.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
@@ -53,6 +56,7 @@ require (
 	github.com/jinzhu/gorm v1.9.10
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/jrick/logrotate v1.0.0
+	github.com/jrick/wsrpc/v2 v2.3.2
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/marcopeereboom/sbox v1.0.0
 	github.com/otiai10/copy v1.0.1
@@ -60,6 +64,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.1.0 // indirect
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 // indirect
+	github.com/prometheus/common v0.6.0
 	github.com/robfig/cron v1.2.0
 	github.com/soheilhy/cmux v0.1.4 // indirect
 	github.com/subosito/gozaru v0.0.0-20190625071150-416082cce636
