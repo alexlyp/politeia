@@ -14,7 +14,7 @@ import (
 
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrwallet/errors/v2"
-	"github.com/decred/dcrwallet/rpc/client/dcrd"
+	"github.com/decred/politeia/politeiawww/codestats/client/github-tracker"
 	"github.com/jrick/wsrpc/v2"
 )
 
@@ -24,7 +24,7 @@ var requiredAPIVersion = semver{Major: 1, Minor: 0, Patch: 0}
 // notifications from a dcrd JSON-RPC server.
 type Syncer struct {
 	opts     *RPCOptions
-	rpc      *dcrd.RPC
+	rpc      *github-tracker.RPC
 	notifier *notifier
 }
 
