@@ -2696,10 +2696,13 @@ func New(anp *chaincfg.Params, root string, dcrtimeHost string, gitPath string, 
 	case piMode:
 		g.plugins = []backend.Plugin{getDecredPlugin(dcrdataHost)}
 	case cmsMode:
-		g.plugins = []backend.Plugin{getDecredPlugin(dcrdataHost), getCMSPlugin(anp.Name != "mainnet")}
+		g.plugins = []backend.Plugin{getDecredPlugin(dcrdataHost),
+			getCMSPlugin(anp.Name != "mainnet")}
 
 		setCMSPluginSetting(cmsPluginIdentity, string(idJSON))
 		setCMSPluginSetting(cmsPluginJournals, g.journals)
+	default:
+		return nil, fmt.Errorf("invalid mode")
 	}
 
 	setDecredPluginSetting(decredPluginIdentity, string(idJSON))
