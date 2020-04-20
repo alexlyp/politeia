@@ -1669,3 +1669,19 @@ func convertVoteOptionResultsToCMS(vr []cmsplugin.VoteOptionResult) []cms.VoteOp
 	}
 	return votes
 }
+func convertCMSStartVoteToCMSVoteDetailsReply(sv cmsplugin.StartVote, svr cmsplugin.StartVoteReply) (*cms.VoteDetailsReply, error) {
+	voteb, err := cmsplugin.EncodeVote(sv.Vote)
+	if err != nil {
+		return nil, err
+	}
+	return &cms.VoteDetailsReply{
+		Version:          uint32(sv.Version),
+		Vote:             string(voteb),
+		PublicKey:        sv.PublicKey,
+		Signature:        sv.Signature,
+		StartBlockHeight: svr.StartBlockHeight,
+		StartBlockHash:   svr.StartBlockHash,
+		EndBlockHeight:   svr.EndHeight,
+		UserWeights:      svr.EligibleUsers,
+	}, nil
+}
