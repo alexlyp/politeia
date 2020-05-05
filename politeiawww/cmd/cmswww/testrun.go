@@ -572,6 +572,13 @@ func testDCCVote(admin user) error {
 		return err
 	}
 
+	// Login
+	fmt.Printf("  Login admin\n")
+	err = login(admin)
+	if err != nil {
+		return err
+	}
+
 	// Start vote
 	fmt.Printf("  Start vote\n")
 	svc := StartVoteCmd{}
