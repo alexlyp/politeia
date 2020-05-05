@@ -186,7 +186,7 @@ func dccNew(sponsor user, nomineeID string, dcct cms.DCCTypeT, dt cms.DomainType
 		Payload: base64.StdEncoding.EncodeToString(b),
 	}
 	files := []www.File{f}
-	sig, err := shared.SignedMerkleRoot(files, cfg.Identity)
+	sig, err := shared.SignedMerkleRoot(files, nil, cfg.Identity)
 	if err != nil {
 		return nil, err
 	}
@@ -572,9 +572,11 @@ func testDCCVote(admin user) error {
 		return err
 	}
 
-	// Start an all contractor vote for the DCC
-	err = dccSetStatus(admin, dccToken, cms.DCCStatusAllVote,
-		"support was contentious")
+	// Start vote
+	fmt.Printf("  Start vote\n")
+	svc := StartVoteCmd{}
+	svc.Args.Token = dccToken
+	err = svc.Execute(nil)
 	if err != nil {
 		return err
 	}
