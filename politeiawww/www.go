@@ -10,9 +10,6 @@ import (
 	"crypto/elliptic"
 	"crypto/tls"
 	_ "encoding/gob"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -24,15 +21,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/decred/politeia/mdstream"
 	pd "github.com/decred/politeia/politeiad/api/v1"
 	pdv2 "github.com/decred/politeia/politeiad/api/v2"
 	pdclient "github.com/decred/politeia/politeiad/client"
 	cms "github.com/decred/politeia/politeiawww/api/cms/v1"
 	www "github.com/decred/politeia/politeiawww/api/www/v1"
-	database "github.com/decred/politeia/politeiawww/cmsdatabase"
-	cmsdb "github.com/decred/politeia/politeiawww/cmsdatabase/cockroachdb"
-	ghtracker "github.com/decred/politeia/politeiawww/codetracker/github"
 	"github.com/decred/politeia/politeiawww/config"
 	"github.com/decred/politeia/politeiawww/events"
 	"github.com/decred/politeia/politeiawww/mail"
@@ -43,11 +36,9 @@ import (
 	"github.com/decred/politeia/politeiawww/user/mysql"
 	"github.com/decred/politeia/util"
 	"github.com/decred/politeia/util/version"
-	"github.com/decred/politeia/wsdcrdata"
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
-	"github.com/robfig/cron"
 )
 
 type permission uint
@@ -328,6 +319,7 @@ func (p *politeiawww) getPluginInventory() ([]pdv2.Plugin, error) {
 	return plugins, nil
 }
 
+/*
 func (p *politeiawww) setupCMS() error {
 	// Setup routes
 	p.setCMSWWWRoutes()
@@ -486,6 +478,7 @@ func (p *politeiawww) setupCMS() error {
 
 	return nil
 }
+*/
 
 func _main() error {
 	// Load configuration and parse command line.  This function also
@@ -708,9 +701,9 @@ func _main() error {
 			return fmt.Errorf("setupPi: %v", err)
 		}
 	case config.CMSWWWMode:
-		err = p.setupCMS()
+		err = p.setupCms()
 		if err != nil {
-			return fmt.Errorf("setupCMS: %v", err)
+			return fmt.Errorf("setupCms: %v", err)
 		}
 	default:
 		return fmt.Errorf("unknown mode: %v", p.cfg.Mode)
