@@ -73,6 +73,78 @@ var (
 	}
 )
 
+/*
+	// PolicyValidMimeTypes is the accepted mime types of attachments
+	// in invoices
+	PolicyValidMimeTypes = []string{
+		"image/png",
+	}
+
+	// PolicyInvoiceFieldSupportedChars is the regular expression of a valid
+	// invoice fields.
+	PolicyInvoiceFieldSupportedChars = []string{
+		"A-z", "0-9", "&", ".", ",", ":", ";", "-", " ", "@", "+", "#", "/",
+		"(", ")", "!", "?", "\"", "'"}
+
+	// PolicyCMSNameLocationSupportedChars is the regular expression of a valid
+	// name or location for registering users on cms.
+	PolicyCMSNameLocationSupportedChars = []string{
+		"A-z", "0-9", ".", "-", " ", ","}
+
+	// PolicyCMSContactSupportedChars is the regular expression of a valid
+	// contact for registering users on cms.
+	PolicyCMSContactSupportedChars = []string{
+		"A-z", "0-9", "&", ".", ":", "-", "_", "@", "+", ",", " "}
+
+	// PolicySponsorStatementSupportedChars is the regular expression of a valid
+	// sponsor statement for DCC in cms.
+	PolicySponsorStatementSupportedChars = []string{
+		"A-z", "0-9", "&", ".", ",", ":", ";", "-", " ", "@", "+", "#", "/",
+		"(", ")", "!", "?", "\"", "'", "\n"}
+
+	// PolicySupportedCMSDomains supplies the currently available domain types
+	// and descriptions of them.
+	PolicySupportedCMSDomains = []AvailableDomain{
+		{
+			Description: "development",
+			Type:        DomainTypeDeveloper,
+		},
+		{
+			Description: "marketing",
+			Type:        DomainTypeMarketing,
+		},
+		{
+			Description: "research",
+			Type:        DomainTypeResearch,
+		},
+		{
+			Description: "design",
+			Type:        DomainTypeDesign,
+		},
+	}
+
+	// PolicyCMSSupportedLineItemTypes supplies the currently available invoice types
+	// and descriptions of them.
+	PolicyCMSSupportedLineItemTypes = []AvailableLineItemType{
+		{
+			Description: "labor",
+			Type:        LineItemTypeLabor,
+		},
+		{
+			Description: "expense",
+			Type:        LineItemTypeExpense,
+		},
+		{
+			Description: "misc",
+			Type:        LineItemTypeMisc,
+		},
+		{
+			Description: "subhours",
+			Type:        LineItemTypeSubHours,
+		},
+	}
+*/
+
 // ErrorCodeT represents a plugin error that was caused by the user.
 type ErrorCodeT uint32
 
@@ -104,25 +176,101 @@ const (
 	// does not adhere to the invoice name settings.
 	ErrorCodeInvoiceNameInvalid ErrorCodeT = 6
 
-	// ErrorCodeVoteStatusInvalid is returned when a invoice vote
-	// status does not allow changes to be made to the invoice.
-	ErrorCodeVoteStatusInvalid ErrorCodeT = 7
+	// ErrorCodeLocationMissing
+	ErrorCodeLocationMissing = 7
+
+	// ErrorCodeLocationInvalid
+	ErrorCodeLocationInvalid = 8
+
+	// ErrorCodeMonthYearMissing
+	ErrorCodeMonthYearMissing = 9
+
+	// ErrorCodeMonthYearInvalid
+	ErrorCodeMonthYearInvalid = 10
+
+	// ErrorCodeLineItemInvalid
+	ErrorCodeLineItemInvalid = 11
+
+	// ErrorCodePaymentAddressInvalid
+	ErrorCodePaymentAddressInvalid = 12
+
+	// ErrorCodeContractorNameMissing
+	ErrorCodeContractorNameMissing = 13
+
+	// ErrorCodeContractorContactMissing
+	ErrorCodeContractorContactMissing = 14
+
+	// ErrorCodeContractorContactInvalid
+	ErrorCodeContractorContactInvalid = 15
+
+	// ErrorCodeContractorRateMissing
+	ErrorCodeContractorRateMissing = 16
+
+	// ErrorCodeContractorRateInvalid
+	ErrorCodeContractorRateInvalid = 17
+
+	// ErrorCodeProposalTokenInvalid
+	ErrorCodeProposalTokenInvalid = 18
+
+	// ErrorCodeLineItemDomainInvalid
+	ErrorCodeLineItemDomainInvalid = 19
+
+	// ErrorCodeLineItemSubdomainInvalid
+	ErrorCodeLineItemSubdomainInvalid = 20
+
+	// ErrorCodeLineItemDescriptionInvalid
+	ErrorCodeLineItemDescriptionInvalid = 21
+
+	// ErrorCodeMinRequiredLineItems
+	ErrorCodeMinRequiredLineItems = 22
+
+	// ErrorCodeExchangeRateInvalid
+	ErrorCodeExchangeRateInvalid = 23
+
+	// ErrorCodeLineItemTypeInvalid
+	ErrorCodeLineItemTypeInvalid = 24
+
+	// ErrorCodeLaborExpenseInvalid
+	ErrorCodeLaborExpenseInvalid = 25
 
 	// ErrorCodeLast unit test only.
-	ErrorCodeLast ErrorCodeT = 8
+	ErrorCodeLast ErrorCodeT = 26
 )
 
 var (
 	// ErrorCodes contains the human readable errors.
 	ErrorCodes = map[ErrorCodeT]string{
-		ErrorCodeInvalid:               "error code invalid",
-		ErrorCodeTextFileNameInvalid:   "text file name invalid",
-		ErrorCodeTextFileSizeInvalid:   "text file size invalid",
-		ErrorCodeTextFileMissing:       "text file is misisng",
-		ErrorCodeImageFileCountInvalid: "image file count invalid",
-		ErrorCodeImageFileSizeInvalid:  "image file size invalid",
-		ErrorCodeInvoiceNameInvalid:    "invoice name invalid",
-		ErrorCodeVoteStatusInvalid:     "vote status invalid",
+		ErrorCodeInvalid:                  "error code invalid",
+		ErrorCodeTextFileNameInvalid:      "text file name invalid",
+		ErrorCodeTextFileSizeInvalid:      "text file size invalid",
+		ErrorCodeTextFileMissing:          "text file is misisng",
+		ErrorCodeImageFileCountInvalid:    "image file count invalid",
+		ErrorCodeImageFileSizeInvalid:     "image file size invalid",
+		ErrorCodeInvoiceNameInvalid:       "invoice name invalid",
+		ErrorCodeLocationInvalid:          "malformed location",
+		ErrorCodeMonthYearInvalid:         "an invalid month/year was submitted on an invoice",
+		ErrorCodeMonthYearMissing:         "month or year was set, while the other was not",
+		ErrorCodeLineItemInvalid:          "malformed line item submitted",
+		ErrorCodeContractorNameMissing:    "invoice missing contractor name",
+		ErrorCodeContractorContactMissing: "invoice missing contractor contact",
+
+		ErrorCodeContractorContactInvalid:   "invoice has malformed contractor contact",
+		ErrorCodeContractorRateMissing:      "invoice missing contractor rate",
+		ErrorCodeContractorRateInvalid:      "invoice has invalid contractor rate",
+		ErrorCodeProposalTokenInvalid:       "line item has malformed proposal token",
+		ErrorCodeLineItemDomainInvalid:      "line item has malformed domain",
+		ErrorCodeLineItemSubdomainInvalid:   "line item has malformed subdomain",
+		ErrorCodeLineItemDescriptionInvalid: "line item has malformed description",
+		ErrorCodeMinRequiredLineItems:       "invoices require at least 1 line item",
+		ErrorCodeExchangeRateInvalid:        "exchange rate was invalid or didn't match expected result",
+		ErrorCodeLineItemTypeInvalid:        "line item has an invalid type",
+		ErrorCodeLaborExpenseInvalid:        "line item has an invalid labor or expense field",
+		/*
+			ErrorStatusInvalidInvoiceStatusTransition: "invalid invoice status transition",
+			ErrorStatusReasonNotProvided:              "reason for action not provided",
+			ErrorStatusInvoiceDuplicate:               "submitted invoice is a duplicate of an existing invoice",
+			ErrorStatusWrongInvoiceStatus: "invoice is an wrong status to be editted (approved, rejected or paid)",
+		*/
 	}
 )
 
