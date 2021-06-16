@@ -14,7 +14,7 @@ import (
 
 	backend "github.com/decred/politeia/politeiad/backendv2"
 	"github.com/decred/politeia/politeiad/backendv2/tstorebe/plugins"
-	"github.com/decred/politeia/politeiad/plugins/pi"
+	"github.com/decred/politeia/politeiad/plugins/cms"
 	"github.com/decred/politeia/util"
 )
 
@@ -22,35 +22,35 @@ var (
 	_ plugins.PluginClient = (*cmsPlugin)(nil)
 )
 
-// cmsPlugin is the tstore backend implementation of the pi plugin. The pi
-// plugin extends a record with functionality specific to the decred proposal
+// cmsPlugin is the tstore backend implementation of the cms plugin. The cms
+// plugin extends a record with functionality specific to the decred invoice
 // system.
 //
 // cmsPlugin satisfies the plugins PluginClient interface.
 type cmsPlugin struct {
 	backend backend.Backend
 
-	// dataDir is the pi plugin data directory. The only data that is
+	// dataDir is the cms plugin data directory. The only data that is
 	// stored here is cached data that can be re-created at any time
 	// by walking the trillian trees.
 	dataDir string
 
 	// Plugin settings
-	textFileCountMax           uint32
-	textFileSizeMax            uint32 // In bytes
-	imageFileCountMax          uint32
-	imageFileSizeMax           uint32 // In bytes
-	proposalNameSupportedChars string // JSON encoded []string
-	proposalNameLengthMin      uint32 // In characters
-	proposalNameLengthMax      uint32 // In characters
-	proposalNameRegexp         *regexp.Regexp
+	textFileCountMax          uint32
+	textFileSizeMax           uint32 // In bytes
+	imageFileCountMax         uint32
+	imageFileSizeMax          uint32 // In bytes
+	invoiceNameSupportedChars string // JSON encoded []string
+	invoiceNameLengthMin      uint32 // In characters
+	invoiceNameLengthMax      uint32 // In characters
+	invoiceNameRegexp         *regexp.Regexp
 }
 
 // Setup performs any plugin setup that is required.
 //
 // This function satisfies the plugins PluginClient interface.
-func (p *cmsPlugin) Setup() error {
-	log.Tracef("pi Setup")
+func (c *cmsPlugin) Setup() error {
+	log.Tracef("cms Setup")
 
 	return nil
 }
@@ -58,8 +58,8 @@ func (p *cmsPlugin) Setup() error {
 // Cmd executes a plugin command.
 //
 // This function satisfies the plugins PluginClient interface.
-func (p *cmsPlugin) Cmd(token []byte, cmd, payload string) (string, error) {
-	log.Tracef("pi Cmd: %x %v %v", token, cmd, payload)
+func (c *cmsPlugin) Cmd(token []byte, cmd, payload string) (string, error) {
+	log.Tracef("cms Cmd: %x %v %v", token, cmd, payload)
 
 	return "", backend.ErrPluginCmdInvalid
 }
@@ -67,16 +67,16 @@ func (p *cmsPlugin) Cmd(token []byte, cmd, payload string) (string, error) {
 // Hook executes a plugin hook.
 //
 // This function satisfies the plugins PluginClient interface.
-func (p *cmsPlugin) Hook(h plugins.HookT, payload string) error {
-	log.Tracef("pi Hook: %v", plugins.Hooks[h])
+func (c *cmsPlugin) Hook(h plugins.HookT, payload string) error {
+	log.Tracef("cms Hook: %v", plugins.Hooks[h])
 
 	switch h {
 	case plugins.HookTypeNewRecordPre:
-		return p.hookNewRecordPre(payload)
+		return c.hookNewRecordPre(payload)
 	case plugins.HookTypeEditRecordPre:
-		return p.hookEditRecordPre(payload)
+		return c.hookEditRecordPre(payload)
 	case plugins.HookTypePluginPre:
-		return p.hookPluginPre(payload)
+		return c.hookPluginPre(payload)
 	}
 
 	return nil
@@ -85,8 +85,8 @@ func (p *cmsPlugin) Hook(h plugins.HookT, payload string) error {
 // Fsck performs a plugin filesystem check.
 //
 // This function satisfies the plugins PluginClient interface.
-func (p *cmsPlugin) Fsck() error {
-	log.Tracef("pi Fsck")
+func (c *cmsPlugin) Fsck() error {
+	log.Tracef("cms Fsck")
 
 	return nil
 }
@@ -94,37 +94,37 @@ func (p *cmsPlugin) Fsck() error {
 // Settings returns the plugin's settings.
 //
 // This function satisfies the plugins PluginClient interface.
-func (p *cmsPlugin) Settings() []backend.PluginSetting {
-	log.Tracef("pi Settings")
+func (c *cmsPlugin) Settings() []backend.PluginSetting {
+	log.Tracef("cms Settings")
 
 	return []backend.PluginSetting{
 		{
-			Key:   pi.SettingKeyTextFileSizeMax,
-			Value: strconv.FormatUint(uint64(p.textFileSizeMax), 10),
+			Key:   cms.SettingKeyTextFileSizeMax,
+			Value: strconv.FormatUint(uint64(c.textFileSizeMax), 10),
 		},
 		{
-			Key:   pi.SettingKeyImageFileCountMax,
-			Value: strconv.FormatUint(uint64(p.imageFileCountMax), 10),
+			Key:   cms.SettingKeyImageFileCountMax,
+			Value: strconv.FormatUint(uint64(c.imageFileCountMax), 10),
 		},
 		{
-			Key:   pi.SettingKeyImageFileCountMax,
-			Value: strconv.FormatUint(uint64(p.imageFileCountMax), 10),
+			Key:   cms.SettingKeyImageFileCountMax,
+			Value: strconv.FormatUint(uint64(c.imageFileCountMax), 10),
 		},
 		{
-			Key:   pi.SettingKeyImageFileSizeMax,
-			Value: strconv.FormatUint(uint64(p.imageFileSizeMax), 10),
+			Key:   cms.SettingKeyImageFileSizeMax,
+			Value: strconv.FormatUint(uint64(c.imageFileSizeMax), 10),
 		},
 		{
-			Key:   pi.SettingKeyProposalNameLengthMin,
-			Value: strconv.FormatUint(uint64(p.proposalNameLengthMin), 10),
+			Key:   cms.SettingKeyInvoiceNameLengthMin,
+			Value: strconv.FormatUint(uint64(c.invoiceNameLengthMin), 10),
 		},
 		{
-			Key:   pi.SettingKeyProposalNameLengthMax,
-			Value: strconv.FormatUint(uint64(p.proposalNameLengthMax), 10),
+			Key:   cms.SettingKeyInvoiceNameLengthMax,
+			Value: strconv.FormatUint(uint64(c.invoiceNameLengthMax), 10),
 		},
 		{
-			Key:   pi.SettingKeyProposalNameSupportedChars,
-			Value: p.proposalNameSupportedChars,
+			Key:   cms.SettingKeyInvoiceNameSupportedChars,
+			Value: c.invoiceNameSupportedChars,
 		},
 	}
 }
@@ -132,7 +132,7 @@ func (p *cmsPlugin) Settings() []backend.PluginSetting {
 // New returns a new cmsPlugin.
 func New(backend backend.Backend, settings []backend.PluginSetting, dataDir string) (*cmsPlugin, error) {
 	// Create plugin data directory
-	dataDir = filepath.Join(dataDir, pi.PluginID)
+	dataDir = filepath.Join(dataDir, cms.PluginID)
 	err := os.MkdirAll(dataDir, 0700)
 	if err != nil {
 		return nil, err
@@ -140,53 +140,53 @@ func New(backend backend.Backend, settings []backend.PluginSetting, dataDir stri
 
 	// Setup plugin setting default values
 	var (
-		textFileSizeMax    = pi.SettingTextFileSizeMax
-		imageFileCountMax  = pi.SettingImageFileCountMax
-		imageFileSizeMax   = pi.SettingImageFileSizeMax
-		nameLengthMin      = pi.SettingProposalNameLengthMin
-		nameLengthMax      = pi.SettingProposalNameLengthMax
-		nameSupportedChars = pi.SettingProposalNameSupportedChars
+		textFileSizeMax    = cms.SettingTextFileSizeMax
+		imageFileCountMax  = cms.SettingImageFileCountMax
+		imageFileSizeMax   = cms.SettingImageFileSizeMax
+		nameLengthMin      = cms.SettingInvoiceNameLengthMin
+		nameLengthMax      = cms.SettingInvoiceNameLengthMax
+		nameSupportedChars = cms.SettingInvoiceNameSupportedChars
 	)
 
 	// Override defaults with any passed in settings
 	for _, v := range settings {
 		switch v.Key {
-		case pi.SettingKeyTextFileSizeMax:
+		case cms.SettingKeyTextFileSizeMax:
 			u, err := strconv.ParseUint(v.Value, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("invalid plugin setting %v '%v': %v",
 					v.Key, v.Value, err)
 			}
 			textFileSizeMax = uint32(u)
-		case pi.SettingKeyImageFileCountMax:
+		case cms.SettingKeyImageFileCountMax:
 			u, err := strconv.ParseUint(v.Value, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("invalid plugin setting %v '%v': %v",
 					v.Key, v.Value, err)
 			}
 			imageFileCountMax = uint32(u)
-		case pi.SettingKeyImageFileSizeMax:
+		case cms.SettingKeyImageFileSizeMax:
 			u, err := strconv.ParseUint(v.Value, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("invalid plugin setting %v '%v': %v",
 					v.Key, v.Value, err)
 			}
 			imageFileSizeMax = uint32(u)
-		case pi.SettingKeyProposalNameLengthMin:
+		case cms.SettingKeyInvoiceNameLengthMin:
 			u, err := strconv.ParseUint(v.Value, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("invalid plugin setting %v '%v': %v",
 					v.Key, v.Value, err)
 			}
 			nameLengthMin = uint32(u)
-		case pi.SettingKeyProposalNameLengthMax:
+		case cms.SettingKeyInvoiceNameLengthMax:
 			u, err := strconv.ParseUint(v.Value, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("invalid plugin setting %v '%v': %v",
 					v.Key, v.Value, err)
 			}
 			nameLengthMax = uint32(u)
-		case pi.SettingKeyProposalNameSupportedChars:
+		case cms.SettingKeyInvoiceNameSupportedChars:
 			var sc []string
 			err := json.Unmarshal([]byte(v.Value), &sc)
 			if err != nil {
@@ -199,11 +199,11 @@ func New(backend backend.Backend, settings []backend.PluginSetting, dataDir stri
 		}
 	}
 
-	// Setup proposal name regex
+	// Setup invoice name regex
 	rexp, err := util.Regexp(nameSupportedChars, uint64(nameLengthMin),
 		uint64(nameLengthMax))
 	if err != nil {
-		return nil, fmt.Errorf("proposal name regexp: %v", err)
+		return nil, fmt.Errorf("invoice name regexp: %v", err)
 	}
 
 	// Encode the supported chars so that they can be returned as a
@@ -215,14 +215,14 @@ func New(backend backend.Backend, settings []backend.PluginSetting, dataDir stri
 	nameSupportedCharsString := string(b)
 
 	return &cmsPlugin{
-		dataDir:                    dataDir,
-		backend:                    backend,
-		textFileSizeMax:            textFileSizeMax,
-		imageFileCountMax:          imageFileCountMax,
-		imageFileSizeMax:           imageFileSizeMax,
-		proposalNameLengthMin:      nameLengthMin,
-		proposalNameLengthMax:      nameLengthMax,
-		proposalNameSupportedChars: nameSupportedCharsString,
-		proposalNameRegexp:         rexp,
+		dataDir:                   dataDir,
+		backend:                   backend,
+		textFileSizeMax:           textFileSizeMax,
+		imageFileCountMax:         imageFileCountMax,
+		imageFileSizeMax:          imageFileSizeMax,
+		invoiceNameLengthMin:      nameLengthMin,
+		invoiceNameLengthMax:      nameLengthMax,
+		invoiceNameSupportedChars: nameSupportedCharsString,
+		invoiceNameRegexp:         rexp,
 	}, nil
 }

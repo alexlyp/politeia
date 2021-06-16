@@ -10,23 +10,24 @@ import (
 	"os"
 	"testing"
 
+	"github.com/decred/politeia/politeiad/plugins/cms"
 	"github.com/decred/politeia/politeiad/plugins/pi"
 	"github.com/decred/politeia/util"
 )
 
-// newTestPiPlugin returns a piPlugin that has been setup for testing.
-func newTestPiPlugin(t *testing.T) (*piPlugin, func()) {
+// newTestCmsPlugin returns a piPlugin that has been setup for testing.
+func newTestCmsPlugin(t *testing.T) (*cmsPlugin, func()) {
 	// Create plugin data directory
-	dataDir, err := ioutil.TempDir("", pi.PluginID)
+	dataDir, err := ioutil.TempDir("", cms.PluginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Setup proposal name regex
 	var (
-		nameSupportedChars = pi.SettingProposalNameSupportedChars
-		nameLengthMin      = pi.SettingProposalNameLengthMin
-		nameLengthMax      = pi.SettingProposalNameLengthMax
+		nameSupportedChars = cms.SettingInvoiceNameSupportedChars
+		nameLengthMin      = cms.SettingInvoiceNameLengthMin
+		nameLengthMax      = cms.SettingInvoiceNameLengthMax
 	)
 	rexp, err := util.Regexp(nameSupportedChars, uint64(nameLengthMin),
 		uint64(nameLengthMax))
@@ -43,18 +44,18 @@ func newTestPiPlugin(t *testing.T) (*piPlugin, func()) {
 	nameSupportedCharsString := string(b)
 
 	// Setup plugin context
-	p := piPlugin{
-		dataDir:                    dataDir,
-		textFileSizeMax:            pi.SettingTextFileSizeMax,
-		imageFileCountMax:          pi.SettingImageFileCountMax,
-		imageFileSizeMax:           pi.SettingImageFileSizeMax,
-		proposalNameLengthMin:      nameLengthMin,
-		proposalNameLengthMax:      nameLengthMax,
-		proposalNameSupportedChars: nameSupportedCharsString,
-		proposalNameRegexp:         rexp,
+	c := cmsPlugin{
+		dataDir:                   dataDir,
+		textFileSizeMax:           pi.SettingTextFileSizeMax,
+		imageFileCountMax:         pi.SettingImageFileCountMax,
+		imageFileSizeMax:          pi.SettingImageFileSizeMax,
+		invoiceNameLengthMin:      nameLengthMin,
+		invoiceNameLengthMax:      nameLengthMax,
+		invoiceNameSupportedChars: nameSupportedCharsString,
+		invoiceNameRegexp:         rexp,
 	}
 
-	return &p, func() {
+	return &c, func() {
 		err = os.RemoveAll(dataDir)
 		if err != nil {
 			t.Fatal(err)

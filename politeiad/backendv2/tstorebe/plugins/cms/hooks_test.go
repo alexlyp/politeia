@@ -6,9 +6,9 @@ package cms
 
 import "testing"
 
-func TestProposalNameIsValid(t *testing.T) {
+func TestInvoiceNameIsValid(t *testing.T) {
 	// Setup pi plugin
-	p, cleanup := newTestPiPlugin(t)
+	c, cleanup := newTestCmsPlugin(t)
 	defer cleanup()
 
 	tests := []struct {
@@ -75,7 +75,7 @@ func TestProposalNameIsValid(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
-			isValid := p.proposalNameIsValid(test.name)
+			isValid := c.invoiceNameIsValid(test.name)
 			if isValid != test.want {
 				t.Errorf("got %v, want %v", isValid, test.want)
 			}
