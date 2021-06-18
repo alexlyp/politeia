@@ -39,6 +39,11 @@ func (r *Records) processNew(ctx context.Context, n v1.New, u user.User) (*v1.Ne
 		if err != nil {
 			return nil, err
 		}
+	case config.CMSWWWMode:
+		err := r.cmsHookNewRecordPre(u)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Setup metadata stream

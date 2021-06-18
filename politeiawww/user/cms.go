@@ -7,6 +7,23 @@ import (
 )
 
 const (
+	// CmsUserPluginID is a temporary plugin ID for user functionality
+	// that is specific to pi.
+	CmsUserPluginID = "cmsuser"
+
+	// ErrorCodeInvalidContractorType is returned when a user attempts
+	// to submit an invoice while not having the correct contractor type.
+	ErrorCodeInvalidContractorType = 1
+)
+
+var (
+	// ErrorCodes contains the human readable error codes.
+	CmsErrorCodes = map[int]string{
+		ErrorCodeInvalidContractorType: "invalid contractor type",
+	}
+)
+
+const (
 	CMSPluginVersion               = "1"
 	CMSPluginID                    = "cms"
 	CmdNewCMSUser                  = "newcmsuser"

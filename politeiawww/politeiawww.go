@@ -18,6 +18,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/v3"
 	"github.com/decred/politeia/politeiad/api/v1/mime"
 	pdclient "github.com/decred/politeia/politeiad/client"
+	cms "github.com/decred/politeia/politeiawww/api/cms/v1"
 	www "github.com/decred/politeia/politeiawww/api/www/v1"
 	"github.com/decred/politeia/politeiawww/cmsdatabase"
 	"github.com/decred/politeia/politeiawww/codetracker"
@@ -188,6 +189,38 @@ func (p *politeiawww) handlePolicy(w http.ResponseWriter, r *http.Request) {
 		MinVoteDuration:            0,
 		MaxVoteDuration:            0,
 		PaywallConfirmations:       p.cfg.MinConfirmationsRequired,
+	}
+
+	util.RespondWithJSON(w, http.StatusOK, reply)
+}
+
+func (p *politeiawww) handleCMSPolicy(w http.ResponseWriter, r *http.Request) {
+	// Get the policy command.
+	log.Tracef("handleCMSPolicy")
+	reply := &cms.PolicyReply{
+		MinPasswordLength:             www.PolicyMinPasswordLength,
+		MinUsernameLength:             www.PolicyMinUsernameLength,
+		MaxUsernameLength:             www.PolicyMaxUsernameLength,
+		MaxImages:                     cms.PolicyMaxImages,
+		MaxImageSize:                  www.PolicyMaxImageSize,
+		MaxMDs:                        www.PolicyMaxMDs,
+		MaxMDSize:                     www.PolicyMaxMDSize,
+		ValidMIMETypes:                cms.PolicyValidMimeTypes,
+		MinLineItemColLength:          cms.PolicyMinLineItemColLength,
+		MaxLineItemColLength:          cms.PolicyMaxLineItemColLength,
+		MaxNameLength:                 cms.PolicyMaxNameLength,
+		MinNameLength:                 cms.PolicyMinNameLength,
+		MaxLocationLength:             cms.PolicyMaxLocationLength,
+		MinLocationLength:             cms.PolicyMinLocationLength,
+		MaxContactLength:              cms.PolicyMaxContactLength,
+		MinContactLength:              cms.PolicyMinContactLength,
+		InvoiceFieldSupportedChars:    cms.PolicyInvoiceFieldSupportedChars,
+		UsernameSupportedChars:        www.PolicyUsernameSupportedChars,
+		CMSNameLocationSupportedChars: cms.PolicyCMSNameLocationSupportedChars,
+		CMSContactSupportedChars:      cms.PolicyCMSContactSupportedChars,
+		CMSStatementSupportedChars:    cms.PolicySponsorStatementSupportedChars,
+		CMSSupportedDomains:           cms.PolicySupportedCMSDomains,
+		CMSSupportedLineItemTypes:     cms.PolicyCMSSupportedLineItemTypes,
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, reply)

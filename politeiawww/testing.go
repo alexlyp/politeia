@@ -426,7 +426,6 @@ func newTestCMSwww(t *testing.T) (*politeiawww, func()) {
 	}
 
 	// Setup routes
-	p.setCMSWWWRoutes()
 	p.setCMSUserWWWRoutes()
 
 	// The cleanup is handled using a closure so that the temp dir
